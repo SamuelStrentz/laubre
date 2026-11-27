@@ -50,10 +50,13 @@ tests/             tests Vitest sur une base en mémoire
   (JJ/MM/AAAA, MM/AAAA ou AAAA) ; pastille verte / grise sur Naissance, Mariage, Décès pour renseigner ou non
   l'événement (grise = bloc replié, rien d'enregistré) ; ville ou code postal → CP, département,
   ancienne région, pays ; à l'ajout, valeurs proposées comme le logiciel PC (lieux de l'enfant, mariage du conjoint).
-- **Profession** et **source** par événement (acte, registre ou lien https://) ; une source = coche verte dans la fiche.
+- **Profession** et **source** par événement (acte, registre ou lien https://) ; une source = « ✓ Acte sourcé » dans la fiche.
+- **Appui long** sur une bulle de l'arbre ou une vignette des générations : options (fiche, modifier) et accès aux
+  actes renseignés — un lien s'ouvre, une référence écrite se copie. Un acte sans source n'apparaît pas.
 - Le **niveau** n'est modifiable qu'à la création.
 - **Profil** : complétude (un événement « non renseigné » compte comme complet), part des actes sourcés,
-  import / export **GEDCOM**. À l'import, seuls les nouveaux individus de la lignée de la souche sont ajoutés :
+  import / export **GEDCOM**. À l'import, on choisit les générations à importer (cases à cocher, détail par individu
+  en dépliant) ; seuls les nouveaux individus de la lignée de la souche sont ajoutés :
   un individu déjà présent n'est ni remplacé ni complété, les écarts de dates sont ignorés.
 - **Stats** : répartition par département, région, pays, ville ; âge moyen au décès par génération, au mariage ;
   naissances par décennie ; prénoms et noms fréquents.

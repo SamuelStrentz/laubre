@@ -428,3 +428,29 @@ export function exporterGedcom(individus: Individu[], version: string): string {
   out.push('0 TRLR')
   return out.join('\r\n') + '\r\n'
 }
+
+// -------------------------------------------------- sélection avant import
+/**
+ * Garde la sélection cohérente avec la lignée : décocher quelqu'un décoche aussi
+ * ses ascendants (niveaux qui commencent par le sien) ; cocher quelqu'un coche
+ * aussi ses descendants à ajouter (préfixes de son niveau), pour qu'il soit
+ * relié à l'arbre.
+ */
+export function basculerIndividu(selection: Set<string>, niveau: string, possibles: readonly string[]): Set<string> {
+  const s = new Set(selection)
+  if (s.has(niveau)) {
+    for (const n of s) if (n.startsWith(niveau)) s.delete(n)
+  } else {
+    for (const n of possibles) if (niveau.startsWith(n)) s.add(n)
+  }
+  return s
+}
+
+/** Coche / décoche toute une génération (génération g = niveau de g + 1 chiffres). */
+export function basculerGeneration(selection: Set<string>, generation: number, possibles: readonly string[]): Set<string> {
+  const membres = possibles.filter((n) => n.length === generation + 1)
+  const tous = membres.every((n) => selection.has(n))
+  let s = new Set(selection)
+  for (const n of membres) if (s.has(n) === tous) s = basculerIndividu(s, n, possibles)
+  return s
+}

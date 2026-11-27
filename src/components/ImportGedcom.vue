@@ -9,7 +9,7 @@ import Icone from './Icone.vue'
 import { useArbreStore } from '@/stores/arbre'
 import { useUiStore } from '@/stores/ui'
 import { normaliserTexte } from '@/domain/departements'
-import { nomPersonne, planifierImport, trouverSouche, type Gedcom, type ImportPlan } from '@/domain/gedcom'
+import { basculerGeneration, basculerIndividu, nomPersonne, planifierImport, trouverSouche, type Gedcom, type ImportPlan } from '@/domain/gedcom'
 
 const props = defineProps<{ ged: Gedcom | null; nomFichier: string }>()
 const emit = defineEmits<{ fermer: [] }>()
@@ -49,11 +49,56 @@ const plan = computed<ImportPlan | null>(() => {
 })
 const conflits = computed(() => plan.value?.dejaPresents.filter((d) => !d.memeNom) ?? [])
 
+// ------------------------------------------------ choix de ce qui est importé
+const possibles = computed(() => plan.value?.aAjouter.map((a) => a.niveau) ?? [])
+const selection = ref<Set<string>>(new Set())
+const ouvertes = ref<Set<number>>(new Set())
+watch(possibles, (p) => {
+  selection.value = new Set(p)
+  ouvertes.value = new Set()
+})
+
+const LIBELLES = ['Souche et conjoint·e', 'Parents', 'Grands-parents', 'Arrière-grands-parents']
+const generations = computed(() => {
+  const parGen = new Map<number, ImportPlan['aAjouter']>()
+  for (const a of plan.value?.aAjouter ?? []) {
+    const g = a.niveau.length - 1
+    parGen.set(g, [...(parGen.get(g) ?? []), a])
+  }
+  return [...parGen.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([g, individus]) => {
+      const coches = individus.filter((i) => selection.value.has(i.niveau)).length
+      return {
+        g,
+        libelle: LIBELLES[g] ?? (g === 4 ? 'Arrière-arrière-grands-parents' : 'Ancêtres'),
+        individus,
+        coches,
+        etat: coches === 0 ? 'aucun' : coches === individus.length ? 'tous' : 'partiel',
+      }
+    })
+})
+const nbChoisis = computed(() => selection.value.size)
+
+function basculerGen(g: number) {
+  selection.value = basculerGeneration(selection.value, g, possibles.value)
+}
+function basculer(niveau: string) {
+  selection.value = basculerIndividu(selection.value, niveau, possibles.value)
+}
+function deplier(g: number) {
+  const o = new Set(ouvertes.value)
+  if (o.has(g)) o.delete(g)
+  else o.add(g)
+  ouvertes.value = o
+}
+
 async function importer() {
-  if (!plan.value?.aAjouter.length) return
+  const choisis = plan.value?.aAjouter.filter((a) => selection.value.has(a.niveau)) ?? []
+  if (!choisis.length) return
   enCours.value = true
   try {
-    const n = await store.ajouterLot(plan.value.aAjouter.map((a) => ({ saisie: a.saisie })))
+    const n = await store.ajouterLot(choisis.map((a) => ({ saisie: a.saisie })))
     ui.toast(`${n} individu${n > 1 ? 's' : ''} ajouté${n > 1 ? 's' : ''} depuis le GEDCOM`)
     emit('fermer')
   } catch (e) {
@@ -98,25 +143,64 @@ async function importer() {
         <template v-if="plan">
           <h3>2. Ce qui va se passer</h3>
           <ul class="bilan">
-            <li><strong>{{ plan.aAjouter.length }}</strong> nouveaux individus ajoutés</li>
+            <li><strong>{{ plan.aAjouter.length }}</strong> nouveaux individus, à choisir ci-dessous</li>
             <li><strong>{{ plan.dejaPresents.length }}</strong> déjà dans l'appli : gardés tels quels (dates du fichier ignorées)</li>
             <li v-if="conflits.length" class="attention">
               <strong>{{ conflits.length }}</strong> place{{ conflits.length > 1 ? 's' : '' }} déjà occupée{{ conflits.length > 1 ? 's' : '' }} par un autre nom : la version de l'appli est gardée
             </li>
             <li><strong>{{ plan.horsLignee }}</strong> hors de votre lignée (frères, enfants, cousins…) : non importés</li>
           </ul>
-          <button v-if="plan.aAjouter.length" type="button" class="lien" @click="voirDetail = !voirDetail">
-            {{ voirDetail ? 'Masquer le détail' : 'Voir le détail' }}
+          <template v-if="plan.aAjouter.length">
+            <h3>3. Générations à importer</h3>
+            <p class="aide">Décocher quelqu'un retire aussi ses ascendants : chacun reste relié à l'arbre.</p>
+            <ul class="generations">
+              <li v-for="gen in generations" :key="gen.g" class="generation">
+                <div class="ligne-gen">
+                  <label class="case">
+                    <input
+                      type="checkbox"
+                      :checked="gen.etat === 'tous'"
+                      :indeterminate="gen.etat === 'partiel'"
+                      @change="basculerGen(gen.g)"
+                    />
+                    <span>
+                      <strong>Génération {{ gen.g }}</strong>
+                      <small>{{ gen.libelle }} · {{ gen.coches }}/{{ gen.individus.length }}</small>
+                    </span>
+                  </label>
+                  <button
+                    type="button"
+                    class="deplier"
+                    :class="{ ouvert: ouvertes.has(gen.g) }"
+                    :aria-expanded="ouvertes.has(gen.g)"
+                    :aria-label="`Choisir les individus de la génération ${gen.g}`"
+                    @click="deplier(gen.g)"
+                  >
+                    <Icone nom="chevron" :taille="20" />
+                  </button>
+                </div>
+                <ul v-if="ouvertes.has(gen.g)" class="individus">
+                  <li v-for="a in gen.individus" :key="a.niveau">
+                    <label class="case">
+                      <input type="checkbox" :checked="selection.has(a.niveau)" @change="basculer(a.niveau)" />
+                      <span>{{ a.nom }} <code>{{ a.niveau }}</code></span>
+                    </label>
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </template>
+          <button v-if="conflits.length" type="button" class="lien" @click="voirDetail = !voirDetail">
+            {{ voirDetail ? 'Masquer les places occupées' : 'Voir les places occupées' }}
           </button>
           <ul v-if="voirDetail" class="detail">
-            <li v-for="a in plan.aAjouter" :key="a.niveau"><code>{{ a.niveau }}</code> {{ a.nom }}</li>
             <li v-for="c in conflits" :key="'c' + c.niveau" class="attention">
               <code>{{ c.niveau }}</code> fichier : {{ c.nomFichier }} · appli : {{ c.nomAppli }} (gardé)
             </li>
           </ul>
-          <button class="btn btn-principal btn-large" :disabled="enCours || !plan.aAjouter.length" @click="importer">
+          <button class="btn btn-principal btn-large" :disabled="enCours || !nbChoisis" @click="importer">
             <Icone nom="importer" :taille="20" />
-            {{ plan.aAjouter.length ? `Ajouter ${plan.aAjouter.length} individu${plan.aAjouter.length > 1 ? 's' : ''}` : 'Rien de nouveau à ajouter' }}
+            {{ !plan.aAjouter.length ? 'Rien de nouveau à ajouter' : nbChoisis ? `Ajouter ${nbChoisis} individu${nbChoisis > 1 ? 's' : ''}` : 'Aucun individu choisi' }}
           </button>
         </template>
       </article>
@@ -237,6 +321,78 @@ h3 {
   font-family: var(--mono);
   color: var(--sapin);
   margin-right: 6px;
+}
+.generations,
+.individus {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.generation {
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid var(--bord);
+  overflow: hidden;
+}
+.ligne-gen {
+  display: flex;
+  align-items: center;
+}
+.case {
+  flex: 1;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.case input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--sapin);
+}
+.case span {
+  display: grid;
+  min-width: 0;
+}
+.case strong {
+  font-weight: 600;
+  color: var(--sapin);
+}
+.case small {
+  font-size: 0.78rem;
+  color: var(--discret);
+}
+.individus {
+  padding: 4px 8px 8px 24px;
+  background: var(--accent-clair);
+  gap: 0;
+}
+.individus .case {
+  min-height: 44px;
+  font-size: 0.88rem;
+}
+.individus code {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--sapin);
+  margin-left: 4px;
+}
+.deplier {
+  flex: none;
+  width: 48px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  color: var(--sapin);
+  transition: transform 0.2s;
+}
+.deplier.ouvert {
+  transform: rotate(180deg);
 }
 .lien {
   justify-self: start;

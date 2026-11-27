@@ -10,10 +10,13 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import Icone from './Icone.vue'
 import BulleIcone from './BulleIcone.vue'
 import { useArbreStore } from '@/stores/arbre'
+import { useAppuiLong } from '@/composables/useAppuiLong'
 import type { Individu } from '@/domain/individu'
 
-const emit = defineEmits<{ fiche: [niveau: string]; ajouter: [niveau: string] }>()
+const emit = defineEmits<{ fiche: [niveau: string]; ajouter: [niveau: string]; options: [niveau: string] }>()
 const store = useArbreStore()
+/** Appui long sur une bulle : menu d'options (actes renseignés…). */
+const long = useAppuiLong()
 
 const scene = ref<HTMLElement>()
 const L = ref(390)
@@ -103,6 +106,7 @@ function recentrer(n: string) {
 
 /** Bulle centrale (la case verte) : un simple appui ouvre la fiche. */
 function appuiCentre(n: string) {
+  if (!long.clicNormal()) return
   clearTimeout(minuteur)
   dernier = null
   emit('fiche', n)
@@ -110,6 +114,7 @@ function appuiCentre(n: string) {
 
 /** Appui simple (différé pour laisser place au double appui) ou double appui. */
 function appui(n: string, recentre: boolean) {
+  if (!long.clicNormal()) return
   const t = Date.now()
   if (dernier && dernier.n === n && t - dernier.t < DOUBLE) {
     clearTimeout(minuteur)
@@ -157,6 +162,7 @@ const role = (n: string) => (n.endsWith('0') ? 'Père' : 'Mère')
             v-if="individuDe(n)"
             class="bulle b-petite"
             :aria-label="`${individuDe(n)!.prenom1} ${individuDe(n)!.nom}`"
+            v-on="long.ecouteurs(() => emit('options', n))"
             @click="appui(n, true)"
           >
             <BulleIcone :niveau="n" :taille="16" />
@@ -169,7 +175,12 @@ const role = (n: string) => (n.endsWith('0') ? 'Père' : 'Mère')
       <!-- Parents -->
       <div v-for="(n, i) in parents" :key="n" class="noeud moyen" :style="{ left: `${g.xp[i]}px`, top: `${g.yp - RP}px` }">
         <template v-if="individuDe(n)">
-          <button class="bulle b-moyenne" :aria-label="`${individuDe(n)!.prenom1} ${individuDe(n)!.nom}`" @click="appui(n, true)">
+          <button
+            class="bulle b-moyenne"
+            :aria-label="`${individuDe(n)!.prenom1} ${individuDe(n)!.nom}`"
+            v-on="long.ecouteurs(() => emit('options', n))"
+            @click="appui(n, true)"
+          >
             <BulleIcone :niveau="n" :taille="30" />
           </button>
           <span class="nom-moyen">{{ individuDe(n)!.prenom1 }}<br /><small>{{ individuDe(n)!.nom }}</small></span>
@@ -200,6 +211,7 @@ const role = (n: string) => (n.endsWith('0') ? 'Père' : 'Mère')
           v-if="individuDe(centre)"
           class="bulle b-grande"
           :aria-label="`${individuDe(centre)!.prenom1} ${individuDe(centre)!.nom}, ouvrir la fiche`"
+          v-on="long.ecouteurs(() => emit('options', centre))"
           @click="appuiCentre(centre)"
         >
           <BulleIcone :niveau="centre" :taille="44" />
@@ -294,6 +306,9 @@ const role = (n: string) => (n.endsWith('0') ? 'Père' : 'Mère')
   gap: 10px;
 }
 .bulle {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   display: grid;
   place-items: center;
   border-radius: 50%;

@@ -14,6 +14,7 @@ import EcranProfil from '@/components/EcranProfil.vue'
 import EcranStats from '@/components/EcranStats.vue'
 import Recherche from '@/components/Recherche.vue'
 import FicheIndividu from '@/components/FicheIndividu.vue'
+import OptionsIndividu from '@/components/OptionsIndividu.vue'
 import Initialisation from '@/components/Initialisation.vue'
 import { useArbreStore, type Ecran } from '@/stores/arbre'
 import { apresPanneau, retourHistorique } from '@/utils/panneaux'
@@ -44,6 +45,32 @@ function fermerFiche() {
 }
 function surRetour() {
   if (fiche.value) fiche.value = null
+  if (options.value) options.value = null
+}
+
+// ------------------------------------------------- options (appui long)
+const options = ref<string | null>(null)
+const optionsDepuis = ref<Ecran>('arbre')
+
+function ouvrirOptions(niveau: string, depuis: Ecran) {
+  options.value = niveau
+  optionsDepuis.value = depuis
+  history.pushState({ options: true }, '')
+}
+function fermerOptions() {
+  if (!options.value) return
+  options.value = null
+  retourHistorique()
+}
+async function optionsVersFiche(niveau: string) {
+  fermerOptions()
+  await apresPanneau()
+  ouvrirFiche(niveau, optionsDepuis.value)
+}
+async function optionsVersModifier(id: number) {
+  fermerOptions()
+  await apresPanneau()
+  router.push({ path: `/individu/${id}`, query: { depuis: optionsDepuis.value } })
 }
 window.addEventListener('popstate', surRetour)
 onBeforeUnmount(() => window.removeEventListener('popstate', surRetour))
@@ -96,10 +123,18 @@ watch(
     <div class="fenetre">
       <div class="rail" :style="{ transform: `translateX(${-position * 100}%)` }">
         <div class="panneau" :inert="ecran !== 'generations'">
-          <EcranGenerations @fiche="(n) => ouvrirFiche(n, 'generations')" @ajouter="(n) => ajouter(n, 'generations')" />
+          <EcranGenerations
+            @fiche="(n) => ouvrirFiche(n, 'generations')"
+            @ajouter="(n) => ajouter(n, 'generations')"
+            @options="(n) => ouvrirOptions(n, 'generations')"
+          />
         </div>
         <div class="panneau" :inert="ecran !== 'arbre'">
-          <EcranArbre @fiche="(n) => ouvrirFiche(n, 'arbre')" @ajouter="(n) => ajouter(n, 'arbre')" />
+          <EcranArbre
+            @fiche="(n) => ouvrirFiche(n, 'arbre')"
+            @ajouter="(n) => ajouter(n, 'arbre')"
+            @options="(n) => ouvrirOptions(n, 'arbre')"
+          />
         </div>
         <div class="panneau" :inert="ecran !== 'profil'">
           <EcranProfil />
@@ -119,6 +154,7 @@ watch(
       @modifier="modifier"
       @arbre="voirDansArbre"
     />
+    <OptionsIndividu :niveau="options" @fermer="fermerOptions" @fiche="optionsVersFiche" @modifier="optionsVersModifier" />
   </div>
 </template>
 

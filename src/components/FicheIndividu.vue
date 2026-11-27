@@ -44,9 +44,6 @@ const parents = computed(() => {
     .join(', ') || '—'
 })
 
-/** Lien cliquable si la source est une adresse web. */
-const estLien = (t: string) => /^https?:\/\/\S+$/i.test(t.trim())
-
 const prenoms = computed(() => (i.value ? [i.value.prenom2, i.value.prenom3].filter(Boolean).join(', ') : ''))
 
 /** Juste après l'ouverture, on ignore les appuis (2e appui d'un double appui sur la bulle). */
@@ -93,9 +90,8 @@ function surAppuiFiche(e: MouseEvent) {
             <dd>
               <span :class="{ discret: i.sansObjet.includes(ev) }">{{ evenement(ev) }}</span>
               <span v-if="i[`${ev}_source`]" class="source">
-                <svg class="coche" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Source vérifiée"><path d="M5 12l5 5 9-10" /></svg>
-                <a v-if="estLien(i[`${ev}_source`])" :href="i[`${ev}_source`].trim()" target="_blank" rel="noopener noreferrer">{{ i[`${ev}_source`] }}</a>
-                <span v-else>{{ i[`${ev}_source`] }}</span>
+                <svg class="coche" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10" /></svg>
+                Acte sourcé
               </span>
             </dd>
           </template>
@@ -108,7 +104,7 @@ function surAppuiFiche(e: MouseEvent) {
           <button class="btn btn-principal" @click="emit('modifier', i.id)"><Icone nom="crayon" :taille="18" /> Modifier</button>
           <button v-if="voirArbre" class="btn" @click="emit('arbre', i.niveau)"><Icone nom="arbre" :taille="18" /> Dans l'arbre</button>
         </div>
-        <p class="astuce">Double-touchez ou touchez à côté pour fermer</p>
+        <p class="astuce">Double-touchez ou touchez à côté pour fermer · appui long sur une bulle pour les actes</p>
       </article>
     </div>
   </Transition>
@@ -192,9 +188,6 @@ h2 {
   flex: none;
   margin-top: 2px;
   color: #2e9e5b;
-}
-.source a {
-  color: var(--sapin);
 }
 .dates {
   margin: 0;

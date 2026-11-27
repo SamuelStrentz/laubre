@@ -11,6 +11,8 @@ export const CHEMINS = {
   bas: 'M12 5v14M6 13l6 6 6-6',
   droite: 'M5 12h14M13 6l6 6-6 6',
   gauche: 'M19 12H5M11 6l-6 6 6 6',
+  profil: 'M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c0-4 4-6 8-6s8 2 8 6',
+  acte: 'M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6',
   loupe: 'M11 18a7 7 0 100-14 7 7 0 000 14zM20 20l-4-4',
   stats: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
   arbreGed: 'M4 4h6v6H4zM14 14h6v6h-6zM7 10v4h10',

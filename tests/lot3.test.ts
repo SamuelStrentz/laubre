@@ -166,3 +166,22 @@ describe('GEDCOM', () => {
     expect(plan.aAjouter.find((a) => a.niveau === '00')!.saisie.naissance_source).toBe('Acte 12')
   })
 })
+
+describe('sélection avant import (lot 4)', async () => {
+  const { basculerIndividu, basculerGeneration } = await import('@/domain/gedcom')
+  const possibles = ['01', '000', '001', '010', '0100']
+  it('décocher retire aussi les ascendants, cocher rajoute les descendants', () => {
+    let s = new Set(possibles)
+    s = basculerIndividu(s, '01', possibles)
+    expect([...s].sort()).toEqual(['000', '001'])
+    s = basculerIndividu(s, '0100', possibles)
+    expect([...s].sort()).toEqual(['000', '001', '01', '010', '0100'])
+  })
+  it('jusqu\'à une génération', () => {
+    let s = new Set(possibles)
+    s = basculerGeneration(s, 2, possibles)
+    expect([...s].sort()).toEqual(['01'])
+    s = basculerGeneration(s, 2, possibles)
+    expect([...s].sort()).toEqual(['000', '001', '01', '010'])
+  })
+})

@@ -8,10 +8,12 @@ import { computed } from 'vue'
 import Icone from './Icone.vue'
 import BulleIcone from './BulleIcone.vue'
 import { useArbreStore } from '@/stores/arbre'
+import { useAppuiLong } from '@/composables/useAppuiLong'
 import { annee, nomComplet, type Individu } from '@/domain/individu'
 
-const emit = defineEmits<{ fiche: [niveau: string]; ajouter: [niveau: string] }>()
+const emit = defineEmits<{ fiche: [niveau: string]; ajouter: [niveau: string]; options: [niveau: string] }>()
 const store = useArbreStore()
+const long = useAppuiLong()
 
 interface Place {
   niveau: string
@@ -81,7 +83,12 @@ function detail(i: Individu): string {
             <span>{{ f.titre }}</span><small v-if="f.numero">Famille {{ f.numero }}</small>
           </p>
           <template v-for="p in f.places" :key="p.niveau">
-            <button v-if="p.individu" class="carte vignette" @click="emit('fiche', p.niveau)">
+            <button
+              v-if="p.individu"
+              class="carte vignette"
+              v-on="long.ecouteurs(() => emit('options', p.niveau))"
+              @click="long.clicNormal() && emit('fiche', p.niveau)"
+            >
               <span class="avatar"><BulleIcone :niveau="p.niveau" :taille="24" /></span>
               <span class="infos">
                 <strong>{{ nomComplet(p.individu) }}<span v-if="p.individu.souche" class="etoile" aria-label="souche"> ★</span></strong>
@@ -96,7 +103,7 @@ function detail(i: Individu): string {
         </div>
       </div>
     </section>
-    <p class="astuce">Touchez une vignette pour ouvrir la fiche et la modifier.</p>
+    <p class="astuce">Touchez une vignette pour ouvrir la fiche · appui long pour les actes.</p>
   </section>
 </template>
 
@@ -181,6 +188,7 @@ function detail(i: Individu): string {
   text-align: left;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
   transition: transform 0.12s ease;
 }
 .vignette:active {
