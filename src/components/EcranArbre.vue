@@ -11,7 +11,7 @@ import Icone from './Icone.vue'
 import BulleIcone from './BulleIcone.vue'
 import { useArbreStore } from '@/stores/arbre'
 import { useAppuiLong } from '@/composables/useAppuiLong'
-import type { Individu } from '@/domain/individu'
+import { nomComplet, PARENT_INCONNU, type Individu } from '@/domain/individu'
 
 const emit = defineEmits<{ fiche: [niveau: string]; ajouter: [niveau: string]; options: [niveau: string] }>()
 const store = useArbreStore()
@@ -62,25 +62,35 @@ const parents = computed(() => [centre.value + '0', centre.value + '1'])
 const grands = computed(() => [centre.value + '00', centre.value + '01', centre.value + '10', centre.value + '11'])
 const individuDe = (n: string): Individu | null => store.parNiveau.get(n) ?? null
 
+/** Individu connu dont on peut remonter la branche (un parent inconnu la ferme). */
+const ouvert = (n: string) => !!individuDe(n) && !individuDe(n)!.inconnu
+const estInconnu = (n: string) => !!individuDe(n)?.inconnu
+const nomDe = (n: string) => (individuDe(n) ? nomComplet(individuDe(n)!) : '')
+const prenomDe = (n: string) => {
+  const i = individuDe(n)
+  return !i ? '' : i.inconnu ? PARENT_INCONNU : i.prenom1 || i.nom
+}
+const centreInconnu = computed(() => estInconnu(centre.value))
+
 const traits = computed(() => {
   const { xc, xp, xg, yg, yp, yc } = g.value
   const pleins = parents.value.map((n, i) => {
     const x = xp[i]
     const y0 = yc - RC - 6
     const y1 = yp + RP + 44 // sous le prénom / nom
-    return { n, connu: !!individuDe(n), d: `M${xc} ${y0} C${xc} ${y0 - 40}, ${x} ${y1 + 36}, ${x} ${y1}` }
+    return { n, visible: !centreInconnu.value, connu: !!individuDe(n), d: `M${xc} ${y0} C${xc} ${y0 - 40}, ${x} ${y1 + 36}, ${x} ${y1}` }
   })
   const pointilles = grands.value.map((n, i) => {
     const xpar = xp[i < 2 ? 0 : 1]
     const y0 = yp - RP - 6
     const y1 = yg + RG + 20
-    return { n, visible: !!individuDe(parents.value[i < 2 ? 0 : 1]), connu: !!individuDe(n),
+    return { n, visible: !centreInconnu.value && ouvert(parents.value[i < 2 ? 0 : 1]), connu: !!individuDe(n),
       d: `M${xpar} ${y0} C${xpar} ${y0 - 50}, ${xg[i]} ${y1 + 44}, ${xg[i]} ${y1}` }
   })
   return { pleins, pointilles }
 })
 
-/** Conjoint(e) de la personne au centre : même préfixe, dernier chiffre inversé (00 <-> 01). */
+/** Conjoint ou conjointe de la personne au centre : même préfixe, dernier chiffre inversé (00 <-> 01). */
 const conjoint = computed(() => {
   const c = centre.value
   const n = c.slice(0, -1) + (c.endsWith('0') ? '1' : '0')
@@ -147,7 +157,7 @@ const role = (n: string) => (n.endsWith('0') ? 'Père' : 'Mère')
       <svg class="traits" :width="L" :height="H" aria-hidden="true">
         <g fill="none" stroke-linecap="round">
           <template v-for="t in traits.pleins" :key="t.n">
-            <path :d="t.d" :class="t.connu ? 'plein' : 'plein absent'" />
+            <path v-if="t.visible" :d="t.d" :class="t.connu ? 'plein' : 'plein absent'" />
           </template>
           <template v-for="t in traits.pointilles" :key="t.n">
             <path v-if="t.visible" :d="t.d" :class="t.connu ? 'pointille' : 'pointille absent'" />
@@ -157,33 +167,36 @@ const role = (n: string) => (n.endsWith('0') ? 'Père' : 'Mère')
 
       <!-- Grands-parents : petites bulles -->
       <template v-for="(n, i) in grands" :key="n">
-        <div v-if="individuDe(parents[i < 2 ? 0 : 1])" class="noeud petit" :style="{ left: `${g.xg[i]}px`, top: `${g.yg - RG}px` }">
+        <div v-if="!centreInconnu && ouvert(parents[i < 2 ? 0 : 1])" class="noeud petit" :style="{ left: `${g.xg[i]}px`, top: `${g.yg - RG}px` }">
           <button
             v-if="individuDe(n)"
             class="bulle b-petite"
-            :aria-label="`${individuDe(n)!.prenom1} ${individuDe(n)!.nom}`"
+            :class="{ inconnu: estInconnu(n) }"
+            :aria-label="nomDe(n)"
             v-on="long.ecouteurs(() => emit('options', n))"
             @click="appui(n, true)"
           >
             <BulleIcone :niveau="n" :taille="16" />
           </button>
           <button v-else class="bulle b-petite fantome" :aria-label="`Ajouter : ${role(n).toLowerCase()} de ${individuDe(parents[i < 2 ? 0 : 1])!.prenom1}`" @click="emit('ajouter', n)">+</button>
-          <span v-if="individuDe(n)" class="nom-petit">{{ individuDe(n)!.prenom1 || individuDe(n)!.nom }}</span>
+          <span v-if="individuDe(n)" class="nom-petit">{{ prenomDe(n) }}</span>
         </div>
       </template>
 
       <!-- Parents -->
-      <div v-for="(n, i) in parents" :key="n" class="noeud moyen" :style="{ left: `${g.xp[i]}px`, top: `${g.yp - RP}px` }">
+      <div v-for="(n, i) in centreInconnu ? [] : parents" :key="n" class="noeud moyen" :style="{ left: `${g.xp[i]}px`, top: `${g.yp - RP}px` }">
         <template v-if="individuDe(n)">
           <button
             class="bulle b-moyenne"
-            :aria-label="`${individuDe(n)!.prenom1} ${individuDe(n)!.nom}`"
+            :class="{ inconnu: estInconnu(n) }"
+            :aria-label="nomDe(n)"
             v-on="long.ecouteurs(() => emit('options', n))"
             @click="appui(n, true)"
           >
             <BulleIcone :niveau="n" :taille="30" />
           </button>
-          <span class="nom-moyen">{{ individuDe(n)!.prenom1 }}<br /><small>{{ individuDe(n)!.nom }}</small></span>
+          <span v-if="estInconnu(n)" class="nom-moyen absent">{{ PARENT_INCONNU }}</span>
+          <span v-else class="nom-moyen">{{ individuDe(n)!.prenom1 }}<br /><small>{{ individuDe(n)!.nom }}</small></span>
         </template>
         <template v-else>
           <button class="bulle b-moyenne fantome" :aria-label="`Ajouter : ${role(n).toLowerCase()}`" @click="emit('ajouter', n)">+</button>
@@ -197,11 +210,11 @@ const role = (n: string) => (n.endsWith('0') ? 'Père' : 'Mère')
         class="vers-conjoint"
         :class="conjointADroite ? 'a-droite' : 'a-gauche'"
         :style="{ left: `${g.xc + (conjointADroite ? RC + 14 : -RC - 14)}px`, top: `${g.yc}px` }"
-        :aria-label="`Aller au conjoint : ${individuDe(conjoint)!.prenom1} ${individuDe(conjoint)!.nom}`"
+        :aria-label="`Aller au conjoint : ${nomDe(conjoint)}`"
         @click="recentrer(conjoint)"
       >
         <Icone v-if="!conjointADroite" nom="gauche" :taille="14" />
-        <span>{{ individuDe(conjoint)!.prenom1 || individuDe(conjoint)!.nom }}</span>
+        <span>{{ prenomDe(conjoint) }}</span>
         <Icone v-if="conjointADroite" nom="droite" :taille="14" />
       </button>
 
@@ -210,15 +223,16 @@ const role = (n: string) => (n.endsWith('0') ? 'Père' : 'Mère')
         <button
           v-if="individuDe(centre)"
           class="bulle b-grande"
-          :aria-label="`${individuDe(centre)!.prenom1} ${individuDe(centre)!.nom}, ouvrir la fiche`"
+          :class="{ inconnu: centreInconnu }"
+          :aria-label="`${nomDe(centre)}, ouvrir la fiche`"
           v-on="long.ecouteurs(() => emit('options', centre))"
           @click="appuiCentre(centre)"
         >
           <BulleIcone :niveau="centre" :taille="44" />
         </button>
-        <span v-if="individuDe(centre)" class="nom-grand">{{ individuDe(centre)!.prenom1 }} {{ individuDe(centre)!.nom }}</span>
+        <span v-if="individuDe(centre)" class="nom-grand" :class="{ inconnu: centreInconnu }">{{ nomDe(centre) }}</span>
         <button v-if="enfant && individuDe(enfant)" class="vers-enfant" @click="recentrer(enfant)">
-          <Icone nom="bas" :taille="14" /> {{ individuDe(enfant)!.prenom1 }} {{ individuDe(enfant)!.nom }}
+          <Icone nom="bas" :taille="14" /> {{ nomDe(enfant) }}
         </button>
       </div>
     </div>
@@ -339,6 +353,19 @@ const role = (n: string) => (n.endsWith('0') ? 'Père' : 'Mère')
   color: var(--nacre);
   box-shadow: 0 0 0 6px var(--accent-clair), 0 10px 28px rgb(31 74 58 / 22%);
 }
+/* parent inconnu : bulle grisée */
+.bulle.inconnu {
+  background: #d7dcd9;
+  border-color: #b9c2bd;
+  color: #8a948f;
+  box-shadow: none;
+}
+.b-grande.inconnu {
+  box-shadow: 0 0 0 6px #eceeed;
+}
+.nom-grand.inconnu {
+  color: var(--discret);
+}
 .fantome {
   background: transparent;
   border: 1.5px dashed var(--sauge);
@@ -346,7 +373,20 @@ const role = (n: string) => (n.endsWith('0') ? 'Père' : 'Mère')
   font-size: 1.4rem;
   box-shadow: none;
 }
-.b-petite.fantome {
+.b-petite/* parent inconnu : bulle grisée */
+.bulle.inconnu {
+  background: #d7dcd9;
+  border-color: #b9c2bd;
+  color: #8a948f;
+  box-shadow: none;
+}
+.b-grande.inconnu {
+  box-shadow: 0 0 0 6px #eceeed;
+}
+.nom-grand.inconnu {
+  color: var(--discret);
+}
+.fantome {
   font-size: 1rem;
   border-width: 1px;
 }

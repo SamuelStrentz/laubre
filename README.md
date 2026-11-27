@@ -56,6 +56,13 @@ tests/             tests Vitest sur une base en mémoire
 - **Appui long** sur une bulle de l'arbre ou une vignette des générations : options (fiche, modifier) et accès aux
   actes renseignés — un lien s'ouvre, une référence écrite se copie. Un acte sans source n'apparaît pas.
 - Le **niveau** n'est modifiable qu'à la création.
+- **Parent inconnu** : pastille en haut à droite de l'identité (verte = connu). Grise, l'individu s'affiche
+  « Parent inconnu », sa bulle est grisée et sa branche fermée (pas d'ajout de ses parents). Il n'est compté
+  ni dans les statistiques, ni dans le contrôle, ni dans l'export GEDCOM. Impossible pour la souche.
+- **Contrôle des données** (Profil, sous la complétude) : informations manquantes (prénom, nom, dates et lieux
+  des événements non désactivés) et incohérences (décès avant la naissance, parent né après l'enfant,
+  date de mariage différente entre époux…). Toucher une ligne place l'individu au centre de l'arbre ;
+  une fois corrigée, elle disparaît de la liste.
 - **Profil** : complétude (un événement « non renseigné » compte comme complet), part des actes sourcés,
   import / export **GEDCOM**. À l'import, on choisit les générations à importer (cases à cocher, détail par individu
   en dépliant) ; seuls les nouveaux individus de la lignée de la souche sont ajoutés :
@@ -67,7 +74,7 @@ tests/             tests Vitest sur une base en mémoire
 ## Compatibilité avec le logiciel PC
 
 Les ajouts de Laubre restent lisibles par le logiciel PC, qui les ignore :
-colonne `identite.profession` et table `evenement_info` (source et « non renseigné » de chaque événement).
+colonnes `identite.profession` et `identite.inconnu`, et table `evenement_info` (source et « non renseigné » de chaque événement).
 Le logiciel PC conserve ces données quand il modifie un individu.
 
 ## Développement

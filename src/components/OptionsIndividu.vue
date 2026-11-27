@@ -56,7 +56,7 @@ async function copier(texte: string) {
         <div class="feuille" role="menu" :aria-label="`Options : ${nomComplet(i)}`">
           <span class="poignee" aria-hidden="true"></span>
           <header>
-            <span class="avatar"><BulleIcone :niveau="i.niveau" :taille="22" /></span>
+            <span class="avatar" :class="{ inconnu: i.inconnu }"><BulleIcone :niveau="i.niveau" :taille="22" /></span>
             <strong>{{ nomComplet(i) }}</strong>
           </header>
           <button role="menuitem" class="option" @click="emit('fiche', i.niveau)"><Icone nom="profil" :taille="20" /> Voir la fiche</button>
@@ -130,6 +130,10 @@ header strong {
   place-items: center;
   background: var(--sapin);
   color: var(--nacre);
+}
+.avatar.inconnu {
+  background: #d7dcd9;
+  color: #8a948f;
 }
 .option {
   min-height: 52px;

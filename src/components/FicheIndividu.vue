@@ -19,6 +19,7 @@ const i = computed<Individu | null>(() => (props.niveau ? store.parNiveau.get(pr
 
 const dates = computed(() => {
   if (!i.value) return ''
+  if (i.value.inconnu) return 'Branche fermée'
   const n = annee(i.value.naissance_date)
   const d = annee(i.value.deces_date)
   if (n && d) return `${n} – ${d}`
@@ -76,7 +77,7 @@ function surAppuiFiche(e: MouseEvent) {
     <div v-if="i" class="voile-fiche">
       <button class="voile" aria-label="Fermer la fiche" @click="surVoile"></button>
       <article class="fiche" role="dialog" :aria-label="nomComplet(i)" @click="surAppuiFiche">
-        <div class="grosse-bulle"><BulleIcone :niveau="i.niveau" :taille="46" /></div>
+        <div class="grosse-bulle" :class="{ inconnu: i.inconnu }"><BulleIcone :niveau="i.niveau" :taille="46" /></div>
         <header>
           <h2>{{ nomComplet(i) }}<span v-if="i.souche" class="etoile"> ★</span></h2>
           <p v-if="prenoms" class="prenoms">{{ prenoms }}</p>
@@ -85,7 +86,7 @@ function surAppuiFiche(e: MouseEvent) {
         </header>
         <hr />
         <dl>
-          <template v-for="ev in EVENEMENTS" :key="ev">
+          <template v-for="ev in i.inconnu ? [] : EVENEMENTS" :key="ev">
             <dt>{{ TITRES_EVT[ev] }}</dt>
             <dd>
               <span :class="{ discret: i.sansObjet.includes(ev) }">{{ evenement(ev) }}</span>
@@ -138,6 +139,11 @@ function surAppuiFiche(e: MouseEvent) {
   display: grid;
   justify-items: center;
   gap: 12px;
+}
+.grosse-bulle.inconnu {
+  background: #d7dcd9;
+  color: #8a948f;
+  box-shadow: 0 0 0 6px #eceeed;
 }
 .grosse-bulle {
   width: 96px;

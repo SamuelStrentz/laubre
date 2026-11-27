@@ -314,7 +314,7 @@ export function planifierImport(ged: Gedcom, soucheGed: string, existants: Indiv
   const file: { id: string; niveau: string; mariage: EvenementGed | null }[] = []
   const souche = ged.personnes.get(soucheGed)
   if (!souche) throw new Error('Souche introuvable dans le fichier.')
-  // conjoint(e) de la souche : première famille où la souche est époux / épouse
+  // conjoint de la souche : première famille où la souche est époux / épouse
   const famSouche = souche.fams.map((f) => ged.familles.get(f)).find((f) => f && (f.mari === soucheGed ? f.femme : f.mari))
   const conjoint = famSouche ? (famSouche.mari === soucheGed ? famSouche.femme : famSouche.mari) : null
   file.push({ id: soucheGed, niveau: niveauSouche, mariage: famSouche?.mariage ?? null })
@@ -326,6 +326,11 @@ export function planifierImport(ged: Gedcom, soucheGed: string, existants: Indiv
     if (!p || vus.has(id)) continue
     vus.add(id)
     const present = parNiveau.get(niveau)
+    if (present?.inconnu) {
+      // parent inconnu dans l'appli : la version de l'appli prévaut, sa branche reste fermée
+      plan.dejaPresents.push({ niveau, nomFichier: nomPersonne(p), nomAppli: 'Parent inconnu', memeNom: false })
+      continue
+    }
     if (present) {
       const memeNom = cle(present.prenom1, present.nom) === cle(p.prenoms[0] ?? '', p.nom)
       plan.dejaPresents.push({ niveau, nomFichier: nomPersonne(p), nomAppli: `${present.prenom1} ${present.nom}`.trim(), memeNom })
@@ -365,7 +370,8 @@ function ligne(niveau: number, tag: string, val = '', xref = ''): string[] {
 
 export function exporterGedcom(individus: Individu[], version: string): string {
   const parNiveau = new Map<string, Individu>()
-  for (const i of [...individus].sort((a, b) => a.id - b.id)) if (!parNiveau.has(i.niveau)) parNiveau.set(i.niveau, i)
+  // un parent inconnu n'est pas exporté (la famille n'a alors qu'un parent)
+  for (const i of [...individus].sort((a, b) => a.id - b.id)) if (!i.inconnu && !parNiveau.has(i.niveau)) parNiveau.set(i.niveau, i)
   const ref = (i: Individu) => `@I${i.id}@`
 
   // familles : un couple = préfixe P (P0 + P1), enfant = P

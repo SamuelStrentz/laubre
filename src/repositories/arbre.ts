@@ -45,6 +45,7 @@ function versIndividu(r: Ligne): Individu {
     souche: Number(r.souche) === 1,
     famille: r.famille === null || r.famille === undefined ? null : Number(r.famille),
     sansObjet: EVENEMENTS.filter((ev) => Number(r[`${ev}_sans_objet`]) === 1),
+    inconnu: Number(r.inconnu) === 1,
   }
   for (const k of ['prenom1', 'prenom2', 'prenom3', 'nom', 'profession']) d[k] = String(r[k] ?? '')
   for (const ev of EVENEMENTS) {
@@ -150,10 +151,10 @@ function ecrireTout(db: SqlDb, id: number, s: Saisie, sansObjet: readonly Evenem
   }
 }
 
-function inserer(db: SqlDb, s: Saisie, souche: boolean, sansObjet: readonly Evenement[]): number {
+function inserer(db: SqlDb, s: Saisie, souche: boolean, sansObjet: readonly Evenement[], inconnu = false): number {
   const { lastId } = db.run(
-    'INSERT INTO identite (niveau, prenom1, prenom2, prenom3, nom, souche, profession) VALUES (?,?,?,?,?,?,?)',
-    [s.niveau, s.prenom1, s.prenom2, s.prenom3, s.nom, souche ? 1 : 0, s.profession],
+    'INSERT INTO identite (niveau, prenom1, prenom2, prenom3, nom, souche, profession, inconnu) VALUES (?,?,?,?,?,?,?,?)',
+    [s.niveau, s.prenom1, s.prenom2, s.prenom3, s.nom, souche ? 1 : 0, s.profession, inconnu ? 1 : 0],
   )
   ecrireTout(db, lastId, s, sansObjet)
   return lastId
@@ -185,34 +186,40 @@ export function recalculerFamilles(db: SqlDb): void {
   }
 }
 
-function controler(s: Saisie): void {
+function controler(s: Saisie, inconnu = false): void {
   if (!s.niveau || !RE_NIVEAU.test(s.niveau)) throw new Error('Le niveau est obligatoire et ne doit contenir que des 0 et des 1.')
-  if (!s.prenom1 && !s.nom) throw new Error('Renseigne au moins un premier prénom ou un nom de famille.')
+  if (!inconnu && !s.prenom1 && !s.nom) throw new Error('Renseigne au moins un premier prénom ou un nom de famille.')
   for (const ev of EVENEMENTS) {
     if (!dateValide(s[`${ev}_date`])) throw new Error('Date invalide. Formats acceptés : JJ/MM/AAAA, MM/AAAA ou AAAA.')
   }
 }
 
-export function ajouter(db: SqlDb, donnees: Partial<Saisie>, souche = false, sansObjet: readonly Evenement[] = []): number {
+export function ajouter(
+  db: SqlDb, donnees: Partial<Saisie>, souche = false, sansObjet: readonly Evenement[] = [], inconnu = false,
+): number {
+  if (souche && inconnu) throw new Error('La souche ne peut pas être un parent inconnu.')
   const s = preparer(donnees, sansObjet)
-  controler(s)
+  controler(s, inconnu)
   return db.tx(() => {
-    const id = inserer(db, s, souche, sansObjet)
+    const id = inserer(db, s, souche, sansObjet, inconnu)
     recalculerFamilles(db)
     return id
   })
 }
 
 /** Le niveau n'est pas modifiable ici : il est fixé à la création (sa place dans l'arbre). */
-export function modifier(db: SqlDb, id: number, donnees: Partial<Saisie>, sansObjet: readonly Evenement[] = []): void {
-  const niveau = db.valeur<string>('SELECT niveau FROM identite WHERE id = ?', [id])
-  if (niveau === undefined) throw new Error('Individu introuvable.')
-  const s = preparer({ ...donnees, niveau }, sansObjet)
-  controler(s)
+export function modifier(
+  db: SqlDb, id: number, donnees: Partial<Saisie>, sansObjet: readonly Evenement[] = [], inconnu = false,
+): void {
+  const ligne = db.get<{ niveau: string; souche: number }>('SELECT niveau, souche FROM identite WHERE id = ?', [id])
+  if (!ligne) throw new Error('Individu introuvable.')
+  if (ligne.souche === 1 && inconnu) throw new Error('La souche ne peut pas être un parent inconnu.')
+  const s = preparer({ ...donnees, niveau: ligne.niveau }, sansObjet)
+  controler(s, inconnu)
   db.tx(() => {
     // prenom1 / nom sont recopiés automatiquement dans les tables liées (CASCADE)
-    db.run('UPDATE identite SET prenom1=?, prenom2=?, prenom3=?, nom=?, profession=? WHERE id=?',
-      [s.prenom1, s.prenom2, s.prenom3, s.nom, s.profession, id])
+    db.run('UPDATE identite SET prenom1=?, prenom2=?, prenom3=?, nom=?, profession=?, inconnu=? WHERE id=?',
+      [s.prenom1, s.prenom2, s.prenom3, s.nom, s.profession, inconnu ? 1 : 0, id])
     ecrireTout(db, id, s, sansObjet)
     recalculerFamilles(db)
   })
@@ -261,11 +268,13 @@ export function niveauConjointe(db: SqlDb): string | null {
   return souche.slice(0, -1) + (souche.endsWith('0') ? '1' : '0')
 }
 
+/** Individus pris en compte dans les statistiques : sans les parents inconnus, et sans la belle-famille si masquée. */
 function filtreLignee(db: SqlDb, avecBelleFamille: boolean, alias = 'i'): string {
-  if (avecBelleFamille) return '1'
+  const connus = `COALESCE(${alias}.inconnu, 0) = 0`
+  if (avecBelleFamille) return connus
   const c = niveauConjointe(db)
-  if (!c) return '1'
-  return `NOT (substr(${alias}.niveau, 1, ${c.length}) = '${c}' AND length(${alias}.niveau) > ${c.length})`
+  if (!c) return connus
+  return `${connus} AND NOT (substr(${alias}.niveau, 1, ${c.length}) = '${c}' AND length(${alias}.niveau) > ${c.length})`
 }
 
 export function statistiques(db: SqlDb, avecBelleFamille = false): Statistiques {
@@ -341,8 +350,8 @@ export function statistiquesDetaillees(db: SqlDb, avecBelleFamille = false): Sta
     decennies: barres(`SELECT (n.annee / 10) * 10 AS libelle, COUNT(*) AS valeur FROM naissance n JOIN identite i ON i.id = n.id
                        WHERE n.annee IS NOT NULL AND ${f} GROUP BY n.annee / 10 ORDER BY n.annee / 10`),
     prenoms: barres(`SELECT prenom AS libelle, COUNT(*) AS valeur FROM (
-                       SELECT prenom1 AS prenom, niveau FROM identite UNION ALL SELECT prenom2, niveau FROM identite
-                       UNION ALL SELECT prenom3, niveau FROM identite) i
+                       SELECT prenom1 AS prenom, niveau, inconnu FROM identite UNION ALL SELECT prenom2, niveau, inconnu FROM identite
+                       UNION ALL SELECT prenom3, niveau, inconnu FROM identite) i
                      WHERE TRIM(COALESCE(prenom, '')) <> '' AND ${f} GROUP BY prenom COLLATE NOCASE
                      ORDER BY valeur DESC, libelle LIMIT 10`),
     noms: barres(`SELECT i.nom AS libelle, COUNT(*) AS valeur FROM identite i WHERE i.nom <> '' AND ${f}

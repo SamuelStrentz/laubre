@@ -3,6 +3,8 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import Icone from './Icone.vue'
 import ImportGedcom from './ImportGedcom.vue'
+import ControleQualite from './ControleQualite.vue'
+import { controlerDonnees, nombreProblemes } from '@/domain/controle'
 import { useArbreStore } from '@/stores/arbre'
 import { useDossierStore } from '@/stores/dossier'
 import { useUiStore } from '@/stores/ui'
@@ -52,6 +54,10 @@ async function importer(e: Event) {
   if (!f) return
   await agir(() => store.importer(f), `Base « ${f.name} » ouverte`)
 }
+
+// --------------------------------------------------------- contrôle qualité
+const controleOuvert = ref(false)
+const nbProblemes = computed(() => nombreProblemes(controlerDonnees(store.individus, store.visible)))
 
 // ------------------------------------------------------------------ GEDCOM
 const fichierGed = ref<HTMLInputElement>()
@@ -129,6 +135,12 @@ async function installer() {
         <div class="barre-fond"><div class="barre-plein" :style="{ width: `${c.pourcentage}%` }"></div></div>
       </div>
     </div>
+
+    <button class="btn btn-large controle" @click="controleOuvert = true">
+      <Icone nom="loupe" :taille="20" /> Contrôler les données manquantes
+      <span v-if="nbProblemes" class="compteur">{{ nbProblemes }}</span>
+    </button>
+    <ControleQualite :ouvert="controleOuvert" @fermer="controleOuvert = false" />
 
     <h2 class="section-titre">Actes sourcés</h2>
     <div class="carte completude">
@@ -292,6 +304,22 @@ h1 {
   border-radius: 3px;
   background: var(--sapin);
   transition: width 0.4s ease;
+}
+.controle {
+  margin-top: 10px;
+  width: 100%;
+}
+.compteur {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 12px;
+  display: inline-grid;
+  place-items: center;
+  background: #fbeee0;
+  color: #8a4b00;
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 .sans-donnees {
   margin: 0;

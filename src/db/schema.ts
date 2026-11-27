@@ -69,6 +69,8 @@ CREATE TABLE IF NOT EXISTS evenement_info (
 /** Colonnes ajoutées aux tables du logiciel PC (ignorées par lui, conservées à ses modifications). */
 export const COLONNES_AJOUTEES: [table: string, colonne: string, type: string][] = [
   ['identite', 'profession', "TEXT DEFAULT ''"],
+  // parent inconnu (ex. enfant né sous le Code civil sans reconnaissance du père) : branche fermée
+  ['identite', 'inconnu', 'INTEGER NOT NULL DEFAULT 0'],
 ]
 
 const ALIAS_INFO: Record<Evenement, string> = { naissance: 'ni', mariage: 'mi', deces: 'di' }
@@ -77,7 +79,7 @@ const ALIAS_INFO: Record<Evenement, string> = { naissance: 'ni', mariage: 'mi', 
 export const REQUETE =
   'SELECT ' +
   [
-    'i.id', 'i.niveau', 'i.prenom1', 'i.prenom2', 'i.prenom3', 'i.nom', 'i.souche', 'i.profession', 'f.numero_famille AS famille',
+    'i.id', 'i.niveau', 'i.prenom1', 'i.prenom2', 'i.prenom3', 'i.nom', 'i.souche', 'i.profession', 'i.inconnu', 'f.numero_famille AS famille',
     ...EVENEMENTS.flatMap((ev) => ['jour', 'mois', 'annee', ...LIEUX].map((c) => `${ALIAS_EVT[ev]}.${c} AS ${ev}_${c}`)),
     ...EVENEMENTS.flatMap((ev) => [`${ALIAS_INFO[ev]}.source AS ${ev}_source`, `${ALIAS_INFO[ev]}.sans_objet AS ${ev}_sans_objet`]),
   ].join(', ') +

@@ -58,7 +58,7 @@ watch(possibles, (p) => {
   ouvertes.value = new Set()
 })
 
-const LIBELLES = ['Souche et conjoint·e', 'Parents', 'Grands-parents', 'Arrière-grands-parents']
+const LIBELLES = ['Souche et conjointe', 'Parents', 'Grands-parents', 'Arrière-grands-parents']
 const generations = computed(() => {
   const parGen = new Map<number, ImportPlan['aAjouter']>()
   for (const a of plan.value?.aAjouter ?? []) {

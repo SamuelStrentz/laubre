@@ -22,6 +22,7 @@ const resultats = computed(() => {
   if (!mots.length) return []
   return store.individus
     .filter((i) => {
+      if (i.inconnu) return false
       const cible = normaliserTexte([i.prenom1, i.prenom2, i.prenom3, i.nom].join(' '))
       return mots.every((m) => cible.includes(m))
     })

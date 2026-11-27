@@ -19,6 +19,8 @@ export interface Individu extends Saisie {
   famille: number | null
   /** Événements déclarés « non renseignés » (pastille grise) : ex. décès d'une personne vivante. */
   sansObjet: Evenement[]
+  /** Parent inconnu (pastille grise de la fiche) : affiché « Parent inconnu », branche fermée. */
+  inconnu: boolean
 }
 
 export interface InfoStockage {
@@ -128,7 +130,9 @@ export function aideNiveau(n: string): { texte: string; erreur: boolean } {
   return { texte: `${estHomme(n) ? 'Homme · père' : 'Femme · mère'} de ${n.slice(0, -1)}`, erreur: false }
 }
 
-export const nomComplet = (i: Pick<Individu, 'prenom1' | 'nom'>) => `${i.prenom1} ${i.nom}`.trim() || 'Sans nom'
+export const PARENT_INCONNU = 'Parent inconnu'
+export const nomComplet = (i: Pick<Individu, 'prenom1' | 'nom'> & { inconnu?: boolean }) =>
+  i.inconnu ? PARENT_INCONNU : `${i.prenom1} ${i.nom}`.trim() || 'Sans nom'
 
 // ------------------------------------------------------- saisie des dates
 /**

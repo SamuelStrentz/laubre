@@ -49,6 +49,9 @@ const nomsConnus = computed<OptionListe[]>(() =>
 
 /** Événements renseignés (pastille verte) ou non (grise : bloc replié, rien d'enregistré). */
 const actifs = ref<Record<Evenement, boolean>>({ naissance: true, mariage: true, deces: true })
+/** Pastille de l'identité : verte = individu connu ; grise = « Parent inconnu » (branche fermée). */
+const connu = ref(true)
+const peutEtreInconnu = computed(() => !estSouche.value)
 
 
 // ---------------------------------------------------------- valeurs proposées
@@ -94,6 +97,7 @@ onMounted(async () => {
     s.value = nettoyer(i)
     // pastille grise = événement déclaré « non renseigné » (enregistré dans la base)
     for (const ev of EVENEMENTS) actifs.value[ev] = !i.sansObjet.includes(ev)
+    connu.value = !i.inconnu
   } else {
     const n = typeof route.query.niveau === 'string' ? route.query.niveau : nouvelleSouche.value ? '0' : ''
     s.value = { ...saisieVide(), niveau: n }
@@ -111,7 +115,7 @@ async function enregistrer() {
   for (const ev of sansObjet) for (const c of CHAMPS_EVT) d[`${ev}_${c}`] = ''
   const e = new Set<string>()
   if (!d.niveau || !RE_NIVEAU.test(d.niveau)) e.add('niveau')
-  if (!d.prenom1 && !d.nom) e.add('prenom1')
+  if (connu.value && !d.prenom1 && !d.nom) e.add('prenom1')
   for (const k of CLES_DATES) if (!dateValide(d[k])) e.add(k)
   erreurs.value = e
   if (e.has('niveau')) return ui.toast('Le niveau est obligatoire : uniquement des 0 et des 1.', 'erreur')
@@ -128,11 +132,11 @@ async function enregistrer() {
   enCours.value = true
   try {
     if (individu.value) {
-      await store.modifier(individu.value.id, d, sansObjet)
+      await store.modifier(individu.value.id, d, sansObjet, !connu.value)
       ui.toast('Modifications enregistrées')
     } else {
-      await store.ajouter(d, souche, sansObjet)
-      ui.toast(souche ? 'Votre arbre est planté 🌲' : `${nomComplet(d)} ajouté${d.niveau.endsWith('1') ? 'e' : ''}`)
+      await store.ajouter(d, souche, sansObjet, !connu.value)
+      ui.toast(souche ? 'Votre arbre est planté 🌲' : !connu.value ? 'Parent inconnu enregistré' : `${nomComplet(d)} ajouté${d.niveau.endsWith('1') ? 'e' : ''}`)
     }
     if (souche || !store.centre) store.centre = store.niveauSouche
     store.ecran = route.query.depuis === 'generations' ? 'generations' : 'arbre'
@@ -177,7 +181,21 @@ const tousLesChampsDates = EVENEMENTS
     </p>
 
     <form novalidate @submit.prevent="enregistrer">
-      <section class="carte identite">
+      <section class="carte identite" :class="{ inconnu: !connu }">
+        <div class="tete-identite">
+          <h2>{{ connu ? 'Identité' : 'Parent inconnu' }}</h2>
+          <button
+            v-if="peutEtreInconnu"
+            type="button"
+            class="interrupteur"
+            role="switch"
+            :aria-checked="connu"
+            :aria-label="connu ? 'Individu connu : toucher pour le déclarer parent inconnu' : 'Parent inconnu : toucher pour le rendre connu'"
+            @click="connu = !connu"
+          >
+            <span class="pastille"></span>
+          </button>
+        </div>
         <div class="niveau">
           <label v-if="!modification" class="champ" :class="{ invalide: erreurs.has('niveau') || aide.erreur }">
             <span>Niveau *</span>
@@ -189,6 +207,11 @@ const tousLesChampsDates = EVENEMENTS
           </div>
           <p class="aide-niveau" :class="{ erreur: aide.erreur }">{{ aide.texte || '0 = homme, 1 = femme (00 = père, 01 = mère)' }}</p>
         </div>
+        <p v-if="!connu" class="note-inconnu">
+          Parent non reconnu ou inconnu (par exemple un enfant né sans reconnaissance du père) : il s'affichera « Parent inconnu »,
+          sa bulle sera grisée et sa branche fermée.
+        </p>
+        <template v-if="connu">
         <label class="champ" :class="{ invalide: erreurs.has('prenom1') }">
           <span>Premier prénom</span>
           <input v-model="s.prenom1" name="prenom1" autocapitalize="words" autocomplete="off" @input="touche('prenom1')" />
@@ -205,9 +228,12 @@ const tousLesChampsDates = EVENEMENTS
           <span>Profession</span>
           <input v-model="s.profession" name="profession" autocapitalize="sentences" autocomplete="off" @input="touche('profession')" />
         </label>
+        </template>
       </section>
 
-      <ChampsEvenement v-for="ev in tousLesChampsDates" :key="ev" v-model="s" v-model:actif="actifs[ev]" :ev="ev" @touche="touche" />
+      <template v-if="connu">
+        <ChampsEvenement v-for="ev in tousLesChampsDates" :key="ev" v-model="s" v-model:actif="actifs[ev]" :ev="ev" @touche="touche" />
+      </template>
 
       <button v-if="individu && !(individu.souche && store.individus.length > 1)" type="button" class="btn btn-danger btn-large" @click="supprimer">
         <Icone nom="corbeille" :taille="20" /> Supprimer cet individu
@@ -235,6 +261,46 @@ import { ANCIENNES_REGIONS } from '@/domain/regions'
   color: var(--discret);
   font-size: 0.92rem;
   line-height: 1.45;
+}
+.tete-identite {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.tete-identite h2 {
+  font-size: 1.1rem;
+  color: var(--sapin);
+}
+.inconnu .tete-identite h2 {
+  color: var(--discret);
+}
+.note-inconnu {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--discret);
+}
+/* même pastille que les blocs Naissance / Mariage / Décès */
+.interrupteur {
+  width: 44px;
+  height: 44px;
+  margin: -12px -12px -12px 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+.pastille {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #2e9e5b;
+  box-shadow: 0 0 0 3px rgb(46 158 91 / 18%);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.interrupteur[aria-checked='false'] .pastille {
+  background: #b9c2bd;
+  box-shadow: 0 0 0 3px rgb(185 194 189 / 25%);
 }
 .identite {
   margin-bottom: 14px;

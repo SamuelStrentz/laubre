@@ -201,11 +201,12 @@ const api = {
   statsDetaillees: (avecBelleFamille = false) => arbre.statistiquesDetaillees(base(), avecBelleFamille),
 
   // --- Écriture (enregistrée immédiatement)
-  ajouter(d: Partial<Saisie>, souche: boolean, sansObjet: Evenement[] = []) {
-    const id = arbre.ajouter(base(), d, souche, sansObjet)
+  ajouter(d: Partial<Saisie>, souche: boolean, sansObjet: Evenement[] = [], inconnu = false) {
+    const id = arbre.ajouter(base(), d, souche, sansObjet, inconnu)
     return { id, info: info() }
   },
-  modifier: (id: number, d: Partial<Saisie>, sansObjet: Evenement[] = []) => arbre.modifier(base(), id, d, sansObjet),
+  modifier: (id: number, d: Partial<Saisie>, sansObjet: Evenement[] = [], inconnu = false) =>
+    arbre.modifier(base(), id, d, sansObjet, inconnu),
   ajouterLot: (lot: { saisie: Partial<Saisie> }[]) => arbre.ajouterLot(base(), lot),
   supprimer: (id: number) => arbre.supprimer(base(), id),
 }

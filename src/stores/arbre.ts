@@ -133,16 +133,16 @@ export const useArbreStore = defineStore('arbre', () => {
   const apresEcriture = () => useDossierStore().planifier()
 
   // --------------------------------------------------------- individus
-  async function ajouter(d: Partial<Saisie>, estSouche = false, sansObjet: Evenement[] = []) {
-    const { id, info } = await api.ajouter(d, estSouche, sansObjet)
+  async function ajouter(d: Partial<Saisie>, estSouche = false, sansObjet: Evenement[] = [], inconnu = false) {
+    const { id, info } = await api.ajouter(d, estSouche, sansObjet, inconnu)
     appliquer(info)
     await recharger()
     apresEcriture()
     return id
   }
 
-  async function modifier(id: number, d: Partial<Saisie>, sansObjet: Evenement[] = []) {
-    await api.modifier(id, d, sansObjet)
+  async function modifier(id: number, d: Partial<Saisie>, sansObjet: Evenement[] = [], inconnu = false) {
+    await api.modifier(id, d, sansObjet, inconnu)
     await recharger()
     apresEcriture()
   }

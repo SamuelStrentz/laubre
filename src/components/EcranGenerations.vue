@@ -37,6 +37,9 @@ function libelleAjout(n: string): string {
   return `${n.endsWith('0') ? 'Ajouter le père' : 'Ajouter la mère'} de ${nomDe(n.slice(0, -1))}`
 }
 
+/** « Souche et conjointe » (ou « et conjoint » si la souche est une femme). */
+const titreSouche = computed(() => (store.niveauSouche.endsWith('1') ? 'Souche et conjoint' : 'Souche et conjointe'))
+
 const generations = computed(() => {
   const niveaux = [...store.parNiveau.keys()]
   if (!niveaux.length) return []
@@ -45,21 +48,25 @@ const generations = computed(() => {
   for (let L = 1; L <= max; L++) {
     const prefixes = new Set(niveaux.filter((n) => n.length === L).map((n) => n.slice(0, -1)))
     // individus de la génération précédente sans aucun parent : place libre (jusqu'à la dernière génération existante)
-    if (L > 1) for (const n of niveaux) if (n.length === L - 1) prefixes.add(n)
+    // (sauf parent inconnu : sa branche est fermée)
+    if (L > 1) for (const n of niveaux) if (n.length === L - 1 && !store.parNiveau.get(n)?.inconnu) prefixes.add(n)
     const familles = [...prefixes]
       .filter((p) => store.visible(p + '0')) // belle-famille masquée par défaut
       .sort()
       .map<Famille>((p) => {
       const places = [p + '0', p + '1'].map((n) => ({ niveau: n, individu: store.parNiveau.get(n) ?? null, libelleAjout: libelleAjout(n) }))
       const numero = places.map((x) => x.individu?.famille).find((f) => f) ?? null
-      return { prefixe: p, titre: p === '' ? 'Souche et conjoint·e' : `Parents de ${nomDe(p)}`, numero, places }
+      return { prefixe: p, titre: p === '' ? titreSouche.value : `Parents de ${nomDe(p)}`, numero, places }
     })
     if (familles.length) resultat.push({ numero: L - 1, familles })
   }
   return resultat
 })
 
+const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? 's' : ''}`
+
 function detail(i: Individu): string {
+  if (i.inconnu) return 'Branche fermée'
   const n = annee(i.naissance_date)
   const d = annee(i.deces_date)
   const dates = n ? (d ? `${n} – ${d}` : n) : d ? `† ${d}` : ''
@@ -72,7 +79,7 @@ function detail(i: Individu): string {
     <header class="tete">
       <div>
         <h1>Générations</h1>
-        <p>{{ store.stats?.individus ?? 0 }} individus · {{ store.stats?.familles ?? 0 }} familles</p>
+        <p>{{ pluriel(store.stats?.individus ?? 0, 'individu') }} · {{ pluriel(store.stats?.familles ?? 0, 'famille') }}</p>
       </div>
       <button
         class="belle-famille"
@@ -100,7 +107,7 @@ function detail(i: Individu): string {
               v-on="long.ecouteurs(() => emit('options', p.niveau))"
               @click="long.clicNormal() && emit('fiche', p.niveau)"
             >
-              <span class="avatar"><BulleIcone :niveau="p.niveau" :taille="24" /></span>
+              <span class="avatar" :class="{ inconnu: p.individu.inconnu }"><BulleIcone :niveau="p.niveau" :taille="24" /></span>
               <span class="infos">
                 <strong>{{ nomComplet(p.individu) }}<span v-if="p.individu.souche" class="etoile" aria-label="souche"> ★</span></strong>
                 <span>{{ detail(p.individu) }}</span>
@@ -238,6 +245,10 @@ function detail(i: Individu): string {
   place-items: center;
   background: var(--accent-clair);
   color: var(--sapin);
+}
+.avatar.inconnu {
+  background: #e6e9e7;
+  color: #9aa39e;
 }
 .infos {
   flex: 1;
