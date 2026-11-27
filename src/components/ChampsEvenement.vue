@@ -4,18 +4,21 @@
  * Comme dans Œnoleptica : saisir une ville (ou un code postal) propose les
  * communes ; en choisir une remplit CP, département, région (ANCIENNE région)
  * et pays.
+ * La pastille en haut à droite active (vert) ou désactive (gris, bloc replié)
+ * l'événement : désactivé, il n'est pas enregistré.
  */
 import { computed, ref } from 'vue'
 import { chercherParCp, chercherParNom, type Commune } from '@/utils/communes'
-import { dateValide, type Saisie } from '@/domain/individu'
+import { dateValide, finaliserDate, masquerDate, type Saisie } from '@/domain/individu'
 import { TITRES_EVT, type Evenement } from '@/db/schema'
 
 const s = defineModel<Saisie>({ required: true })
+const actif = defineModel<boolean>('actif', { default: true })
 const props = defineProps<{ ev: Evenement }>()
 const emit = defineEmits<{ touche: [cle: keyof Saisie] }>()
 
 const cle = (c: string) => `${props.ev}_${c}` as keyof Saisie
-const dateInvalide = computed(() => !dateValide(s.value[cle('date')]))
+const dateInvalide = computed(() => actif.value && !dateValide(s.value[cle('date')]))
 
 const suggestions = ref<Commune[]>([])
 const recherche = ref(false)
@@ -68,21 +71,42 @@ function fermerPlusTard() {
   setTimeout(() => (suggestions.value = []), 200)
 }
 
-/** Aide à la saisie de la date : ajoute les « / » au fil de la frappe (16022003 -> 16/02/2003). */
+/** Les « / » s'ajoutent seuls après le jour et le mois (cf. masquerDate). */
 function surDate(e: Event) {
-  const brut = (e.target as HTMLInputElement).value
-  const chiffres = brut.replace(/\D/g, '')
-  let v = brut
-  if (/^\d+$/.test(brut) && brut.length === 8) v = `${chiffres.slice(0, 2)}/${chiffres.slice(2, 4)}/${chiffres.slice(4)}`
-  else if (/^\d+$/.test(brut) && brut.length === 6) v = `${chiffres.slice(0, 2)}/${chiffres.slice(2)}`
-  if (v !== brut) (e.target as HTMLInputElement).value = v
+  const champ = e.target as HTMLInputElement
+  const ajout = (e as InputEvent).inputType?.startsWith('insert') ?? true
+  const v = masquerDate(champ.value, ajout)
+  if (v !== champ.value) champ.value = v
   maj('date', v)
+}
+
+function surSortieDate(e: Event) {
+  const champ = e.target as HTMLInputElement
+  const v = finaliserDate(champ.value)
+  if (v !== champ.value) {
+    champ.value = v
+    maj('date', v)
+  }
 }
 </script>
 
 <template>
-  <fieldset class="evenement carte">
-    <legend>{{ TITRES_EVT[ev] }}</legend>
+  <fieldset class="evenement carte" :class="{ replie: !actif }">
+    <legend>
+      <span>{{ TITRES_EVT[ev] }}</span>
+      <button
+        type="button"
+        class="interrupteur"
+        role="switch"
+        :aria-checked="actif"
+        :aria-label="`${TITRES_EVT[ev]} : ${actif ? 'renseigné' : 'non renseigné'}`"
+        @click="actif = !actif"
+      >
+        <span class="pastille"></span>
+      </button>
+    </legend>
+    <p v-if="!actif" class="non-renseigne">Non renseigné · touchez la pastille pour le remplir</p>
+    <div v-show="actif" class="corps">
     <label class="champ" :class="{ invalide: dateInvalide }">
       <span>Date</span>
       <input
@@ -92,7 +116,9 @@ function surDate(e: Event) {
         placeholder="JJ/MM/AAAA, MM/AAAA ou AAAA"
         autocomplete="off"
         maxlength="10"
+        enterkeyhint="next"
         @input="surDate"
+        @blur="surSortieDate"
       />
     </label>
     <p v-if="dateInvalide" class="erreur-date">Formats acceptés : JJ/MM/AAAA, MM/AAAA ou AAAA.</p>
@@ -153,6 +179,7 @@ function surDate(e: Event) {
       <span>Pays</span>
       <input :value="s[cle('pays')]" autocapitalize="sentences" autocomplete="off" @input="maj('pays', ($event.target as HTMLInputElement).value)" />
     </label>
+    </div>
   </fieldset>
 </template>
 
@@ -167,9 +194,50 @@ legend {
   width: 100%;
   margin: 0 0 12px;
   padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-family: var(--serif);
   font-size: 1.1rem;
   color: var(--sapin);
+}
+.corps {
+  clear: both;
+}
+.replie legend {
+  margin-bottom: 0;
+  color: var(--discret);
+}
+.non-renseigne {
+  clear: both;
+  margin: 0;
+  padding-top: 4px;
+  font-size: 0.8rem;
+  color: var(--discret);
+}
+/* Pastille : zone tactile de 44 px, pastille visible de 16 px */
+.interrupteur {
+  width: 44px;
+  height: 44px;
+  margin: -12px -12px -12px 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+.pastille {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #2e9e5b;
+  box-shadow: 0 0 0 3px rgb(46 158 91 / 18%);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.interrupteur[aria-checked='false'] .pastille {
+  background: #b9c2bd;
+  box-shadow: 0 0 0 3px rgb(185 194 189 / 25%);
+}
+.interrupteur:active .pastille {
+  transform: scale(0.85);
 }
 .dernier {
   margin-bottom: 0;

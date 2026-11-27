@@ -4,7 +4,7 @@
  * Double appui sur la fiche, ou appui à côté : fermeture.
  * « Modifier » ouvre la fiche de saisie, sur un écran à part.
  */
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import Icone from './Icone.vue'
 import BulleIcone from './BulleIcone.vue'
 import { useArbreStore } from '@/stores/arbre'
@@ -45,9 +45,23 @@ const parents = computed(() => {
 
 const prenoms = computed(() => (i.value ? [i.value.prenom2, i.value.prenom3].filter(Boolean).join(', ') : ''))
 
+/** Juste après l'ouverture, on ignore les appuis (2e appui d'un double appui sur la bulle). */
+let ouverteA = 0
+watch(
+  () => props.niveau,
+  (n) => {
+    if (n) ouverteA = Date.now()
+  },
+)
+const tropTot = () => Date.now() - ouverteA < 450
+
+function surVoile() {
+  if (!tropTot()) emit('fermer')
+}
+
 let dernier = 0
 function surAppuiFiche(e: MouseEvent) {
-  if ((e.target as HTMLElement).closest('button')) return
+  if ((e.target as HTMLElement).closest('button') || tropTot()) return
   const t = Date.now()
   if (t - dernier < 320) {
     dernier = 0
@@ -59,7 +73,7 @@ function surAppuiFiche(e: MouseEvent) {
 <template>
   <Transition name="fiche">
     <div v-if="i" class="voile-fiche">
-      <button class="voile" aria-label="Fermer la fiche" @click="emit('fermer')"></button>
+      <button class="voile" aria-label="Fermer la fiche" @click="surVoile"></button>
       <article class="fiche" role="dialog" :aria-label="nomComplet(i)" @click="surAppuiFiche">
         <div class="grosse-bulle"><BulleIcone :niveau="i.niveau" :taille="46" /></div>
         <header>

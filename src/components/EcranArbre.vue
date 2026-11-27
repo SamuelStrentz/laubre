@@ -92,6 +92,13 @@ function recentrer(n: string) {
   animation.value++
 }
 
+/** Bulle centrale (la case verte) : un simple appui ouvre la fiche. */
+function appuiCentre(n: string) {
+  clearTimeout(minuteur)
+  dernier = null
+  emit('fiche', n)
+}
+
 /** Appui simple (différé pour laisser place au double appui) ou double appui. */
 function appui(n: string, recentre: boolean) {
   const t = Date.now()
@@ -119,7 +126,7 @@ const role = (n: string) => (n.endsWith('0') ? 'Père' : 'Mère')
   <section ref="scene" class="ecran-arbre" aria-label="Arbre">
     <p class="generation">
       <span>{{ libelleGeneration }}</span>
-      <small>Touchez pour centrer · double-touchez pour la fiche</small>
+      <small>Touchez un ancêtre pour le centrer · la bulle verte ouvre la fiche</small>
     </p>
 
     <div :key="animation" class="plan">
@@ -169,8 +176,8 @@ const role = (n: string) => (n.endsWith('0') ? 'Père' : 'Mère')
         <button
           v-if="individuDe(centre)"
           class="bulle b-grande"
-          :aria-label="`${individuDe(centre)!.prenom1} ${individuDe(centre)!.nom}, double-touchez pour la fiche`"
-          @click="appui(centre, false)"
+          :aria-label="`${individuDe(centre)!.prenom1} ${individuDe(centre)!.nom}, ouvrir la fiche`"
+          @click="appuiCentre(centre)"
         >
           <BulleIcone :niveau="centre" :taille="44" />
         </button>

@@ -97,3 +97,44 @@ export function aideNiveau(n: string): { texte: string; erreur: boolean } {
 }
 
 export const nomComplet = (i: Pick<Individu, 'prenom1' | 'nom'>) => `${i.prenom1} ${i.nom}`.trim() || 'Sans nom'
+
+// ------------------------------------------------------- saisie des dates
+/**
+ * Met en forme la date au fil de la frappe : les « / » s'ajoutent seuls
+ * après le jour et après le mois (16 -> « 16/ », 1602 -> « 16/02/ »).
+ * Les autres formats restent possibles :
+ *  - AAAA    : « 1950 » (le « mois » 50 n'existe pas, on garde l'année) ;
+ *  - MM/AAAA : « 06/1950 » (le « mois » 19 n'existe pas, 06 est donc le mois).
+ * `ajout` : vrai quand on tape (faux quand on efface, pour ne pas remettre le « / »).
+ */
+export function masquerDate(brut: string, ajout: boolean): string {
+  // « 1/ » tapé à la main : jour ou mois sur un chiffre, complété par un 0
+  const parties = brut.split('/')
+  const chiffres = parties
+    .map((p, i) => {
+      const c = p.replace(/\D/g, '')
+      return i < parties.length - 1 && i < 2 && c.length === 1 ? '0' + c : c
+    })
+    .join('')
+    .slice(0, 8)
+  const d = chiffres
+  if (d.length <= 2) return d.length === 2 && ajout ? `${d}/` : d
+  const a = d.slice(0, 2)
+  const b = d.slice(2, 4)
+  const c = d.slice(4)
+  // la 2e partie ne peut pas être un mois : année seule, ou MM/AAAA
+  if (Number(b[0]) > 1 || (b.length === 2 && (Number(b) > 12 || b === '00'))) {
+    if (Number(a) > 12 || a === '00') return d.slice(0, 4) // AAAA
+    return `${a}/${(b + c).slice(0, 4)}` // MM/AAAA
+  }
+  if (b.length < 2) return `${a}/${b}`
+  if (!c) return `${a}/${b}${ajout ? '/' : ''}`
+  return `${a}/${b}/${c.slice(0, 4)}`
+}
+
+/** À la sortie du champ : retire un « / » final ; « 18/12 » seul devient l'année 1812. */
+export function finaliserDate(texte: string): string {
+  const t = texte.trim().replace(/\/+$/, '')
+  if (/^\d{2}\/\d{2}$/.test(t)) return t.replace('/', '')
+  return t
+}

@@ -10,11 +10,11 @@ import Icone from '@/components/Icone.vue'
 import ChampListe, { type OptionListe } from '@/components/ChampListe.vue'
 import ChampsEvenement from '@/components/ChampsEvenement.vue'
 import { api } from '@/db/client'
-import { EVENEMENTS } from '@/db/schema'
+import { CHAMPS_EVT, EVENEMENTS, type Evenement } from '@/db/schema'
 import { useArbreStore } from '@/stores/arbre'
 import { useUiStore } from '@/stores/ui'
 import {
-  aideNiveau, CLES_DATES, dateValide, nettoyer, nomComplet, RE_NIVEAU, saisieVide,
+  aideNiveau, CLES_DATES, dateValide, finaliserDate, nettoyer, nomComplet, RE_NIVEAU, saisieVide,
   type Cle, type Individu, type Saisie,
 } from '@/domain/individu'
 
@@ -42,7 +42,14 @@ const aide = computed(() => {
   return { ...a, texte: a.texte && estSouche.value ? `${a.texte} · ★ souche de l'arbre` : a.texte }
 })
 
-const nomsConnus = computed<OptionListe[]>(() => store.noms.map((valeur) => ({ valeur })))
+/** Noms déjà dans la base, en majuscules (le nom de famille est saisi en majuscules). */
+const nomsConnus = computed<OptionListe[]>(() =>
+  [...new Set(store.noms.map((n) => n.toLocaleUpperCase('fr-FR')))].map((valeur) => ({ valeur })),
+)
+
+/** Événements renseignés (pastille verte) ou non (grise : bloc replié, rien d'enregistré). */
+const actifs = ref<Record<Evenement, boolean>>({ naissance: true, mariage: true, deces: true })
+const aDesDonnees = (i: Saisie, ev: Evenement) => CHAMPS_EVT.some((c) => i[`${ev}_${c}`].trim() !== '')
 
 // ---------------------------------------------------------- valeurs proposées
 /** Valeurs posées automatiquement (pour savoir ce qu'on peut remplacer). */
@@ -85,6 +92,7 @@ onMounted(async () => {
     }
     individu.value = i
     s.value = nettoyer(i)
+    for (const ev of EVENEMENTS) actifs.value[ev] = aDesDonnees(s.value, ev)
   } else {
     const n = typeof route.query.niveau === 'string' ? route.query.niveau : nouvelleSouche.value ? '0' : ''
     s.value = { ...saisieVide(), niveau: n }
@@ -95,6 +103,10 @@ onMounted(async () => {
 // ---------------------------------------------------------------- validation
 async function enregistrer() {
   const d = nettoyer(s.value)
+  d.nom = d.nom.toLocaleUpperCase('fr-FR')
+  for (const k of CLES_DATES) d[k] = finaliserDate(d[k])
+  // événement désactivé : rien d'enregistré pour lui
+  for (const ev of EVENEMENTS) if (!actifs.value[ev]) for (const c of CHAMPS_EVT) d[`${ev}_${c}`] = ''
   const e = new Set<string>()
   if (!d.niveau || !RE_NIVEAU.test(d.niveau)) e.add('niveau')
   if (!d.prenom1 && !d.nom) e.add('prenom1')
@@ -181,11 +193,11 @@ const tousLesChampsDates = EVENEMENTS
         </div>
         <div class="champ dernier">
           <span>Nom de famille</span>
-          <ChampListe v-model="s.nom" name="nom" :options="nomsConnus" titre-liste="Noms de l'arbre" placeholder="Nom de famille" />
+          <ChampListe v-model="s.nom" name="nom" :options="nomsConnus" titre-liste="Noms de l'arbre" placeholder="NOM DE FAMILLE" majuscules />
         </div>
       </section>
 
-      <ChampsEvenement v-for="ev in tousLesChampsDates" :key="ev" v-model="s" :ev="ev" @touche="touche" />
+      <ChampsEvenement v-for="ev in tousLesChampsDates" :key="ev" v-model="s" v-model:actif="actifs[ev]" :ev="ev" @touche="touche" />
 
       <button v-if="individu && !(individu.souche && store.individus.length > 1)" type="button" class="btn btn-danger btn-large" @click="supprimer">
         <Icone nom="corbeille" :taille="20" /> Supprimer cet individu

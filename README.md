@@ -38,10 +38,13 @@ tests/             tests Vitest sur une base en mémoire
 - **Première ouverture** : 1. créer la base (ou ouvrir un `.db` existant), 2. choisir son emplacement
   (dossier du téléphone, sous-dossier `db`), 3. créer la souche (vous).
 - **Arbre** (écran d'accueil, toujours ouvert sur la souche) : appui sur un parent ou un grand-parent = il passe au centre ;
-  double appui sur une bulle = fiche flottante (bouton « Modifier ») ; bulle « + » = ajouter l'individu manquant.
+  appui sur la bulle verte du centre, ou double appui sur n'importe quelle bulle = fiche flottante (bouton « Modifier ») ;
+  bulle « + » = ajouter l'individu manquant.
 - **Zone de swipe** en bas : le doigt va vers l'écran voulu — ← Générations, → Profil (les libellés sont aussi touchables).
 - **Générations** : vignettes regroupées par couple (famille), appui = fiche, « Modifier » = saisie.
-- **Saisie** : nom de famille au choix dans la liste des noms de la base ; ville ou code postal → CP, département,
+- **Saisie** : nom de famille en MAJUSCULES, au choix dans la liste des noms de la base ; dates avec « / » automatiques
+  (JJ/MM/AAAA, MM/AAAA ou AAAA) ; pastille verte / grise sur Naissance, Mariage, Décès pour renseigner ou non
+  l'événement (grise = bloc replié, rien d'enregistré) ; ville ou code postal → CP, département,
   ancienne région, pays ; à l'ajout, valeurs proposées comme le logiciel PC (lieux de l'enfant, mariage du conjoint).
 - Chaque modification est enregistrée tout de suite, puis copiée dans le dossier lié.
 

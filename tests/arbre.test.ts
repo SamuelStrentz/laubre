@@ -96,3 +96,27 @@ describe('compatibilité avec le logiciel PC', () => {
     expect(ancienneRegion('68')).toBe('Alsace')
   })
 })
+
+describe('saisie des dates (lot 2)', async () => {
+  const { masquerDate, finaliserDate } = await import('@/domain/individu')
+  /** Simule la frappe touche par touche. */
+  const taper = (touches: string) => [...touches].reduce((v, t) => masquerDate(v + t, true), '')
+  it('ajoute les « / » après le jour et le mois', () => {
+    expect(taper('16')).toBe('16/')
+    expect(taper('1602')).toBe('16/02/')
+    expect(taper('16022003')).toBe('16/02/2003')
+    expect(taper('160220031')).toBe('16/02/2003')
+  })
+  it('garde les formats AAAA et MM/AAAA', () => {
+    expect(taper('1950')).toBe('1950')
+    expect(taper('061950')).toBe('06/1950')
+    expect(taper('121950')).toBe('12/1950')
+    expect(finaliserDate(taper('1812'))).toBe('1812')
+    expect(finaliserDate(taper('2003'))).toBe('2003')
+  })
+  it('complète un jour sur un chiffre et n\'ajoute rien en effaçant', () => {
+    expect(masquerDate('1/', true)).toBe('01/')
+    expect(masquerDate('16', false)).toBe('16')
+    expect(finaliserDate('16/02/')).toBe('1602') // seule lecture valide : l'année 1602
+  })
+})

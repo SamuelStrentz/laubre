@@ -15,7 +15,15 @@ export interface OptionListe {
 }
 
 const modele = defineModel<string>({ required: true })
-const props = defineProps<{ options: OptionListe[]; name?: string; placeholder?: string; titreListe?: string }>()
+const props = defineProps<{
+  options: OptionListe[]
+  name?: string
+  placeholder?: string
+  titreListe?: string
+  /** Force la saisie en majuscules (noms de famille). */
+  majuscules?: boolean
+}>()
+const enMajuscules = (t: string) => (props.majuscules ? t.toLocaleUpperCase('fr-FR') : t)
 const emit = defineEmits<{ choisi: [valeur: string] }>()
 
 const racine = ref<HTMLElement>()
@@ -55,14 +63,24 @@ function basculer() {
   }
 }
 
-function surSaisie() {
+function surSaisie(e: Event) {
+  if (props.majuscules) {
+    const champ = e.target as HTMLInputElement
+    const curseur = champ.selectionStart
+    const haut = enMajuscules(champ.value)
+    if (haut !== champ.value) {
+      champ.value = haut
+      if (curseur !== null) champ.setSelectionRange(curseur, curseur)
+    }
+    modele.value = haut
+  }
   filtrer.value = true
   if (!ouverte.value) placer()
   ouverte.value = visibles.value.length > 0
 }
 
 function choisir(o: OptionListe) {
-  modele.value = o.valeur
+  modele.value = enMajuscules(o.valeur)
   ouverte.value = false
   emit('choisi', o.valeur)
 }
@@ -80,7 +98,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', surDehors))
       v-model="modele"
       :name="name"
       :placeholder="placeholder"
-      autocapitalize="sentences"
+      :autocapitalize="majuscules ? 'characters' : 'sentences'"
       autocomplete="off"
       role="combobox"
       :aria-expanded="ouverte"
@@ -101,13 +119,13 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', surDehors))
         <p v-if="titreListe && !filtrer" class="titre-liste">{{ titreListe }}</p>
         <ul class="options-liste" role="listbox" :style="{ maxHeight: `${hauteurMax}px` }">
           <li v-for="o in visibles" :key="o.valeur">
-            <button type="button" role="option" :aria-selected="o.valeur === modele" @pointerdown.prevent @click="choisir(o)">
+            <button type="button" role="option" :aria-selected="enMajuscules(o.valeur) === modele" @pointerdown.prevent @click="choisir(o)">
               <span v-if="/\p{L}/u.test(o.valeur.charAt(0))" class="initiale">{{ o.valeur.charAt(0).toUpperCase() }}</span>
               <span class="textes">
                 <strong>{{ o.libelle ?? o.valeur }}</strong>
                 <small v-if="o.detail">{{ o.detail }}</small>
               </span>
-              <Icone v-if="o.valeur === modele" nom="coche" :taille="18" />
+              <Icone v-if="enMajuscules(o.valeur) === modele" nom="coche" :taille="18" />
             </button>
           </li>
         </ul>
