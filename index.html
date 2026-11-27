@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#F7F6F1" />
+    <meta name="description" content="Laubre — mon arbre généalogique, dans ma poche." />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <title>Laubre</title>
+    <style>
+      /* Écran de lancement : affiché avant le chargement de l'appli, retiré par App.vue */
+      html { background: #f7f6f1; }
+      #lancement {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: grid;
+        place-content: center;
+        justify-items: center;
+        gap: 10px;
+        background: radial-gradient(90% 55% at 50% 42%, #ffffff 0%, #f7f6f1 70%);
+        transition: opacity 0.45s ease;
+      }
+      #lancement.fini { opacity: 0; pointer-events: none; }
+      #lancement img { width: 120px; height: 120px; border-radius: 26px; animation: lancement-logo 1.6s ease-in-out infinite; }
+      #lancement p {
+        margin: 0;
+        font-family: Georgia, serif;
+        font-size: 2.2rem;
+        letter-spacing: 0.04em;
+        color: #1f4a3a;
+      }
+      @keyframes lancement-logo { 50% { transform: scale(1.04); } }
+    </style>
+  </head>
+  <body>
+    <div id="lancement" aria-hidden="true">
+      <img src="icons/icon.svg" alt="" />
+      <p>Laubre</p>
+    </div>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
