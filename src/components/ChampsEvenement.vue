@@ -175,9 +175,21 @@ function surSortieDate(e: Event) {
         />
       </label>
     </div>
-    <label class="champ dernier">
+    <label class="champ">
       <span>Pays</span>
       <input :value="s[cle('pays')]" autocapitalize="sentences" autocomplete="off" @input="maj('pays', ($event.target as HTMLInputElement).value)" />
+    </label>
+    <label class="champ dernier">
+      <span>Source</span>
+      <input
+        :value="s[cle('source')]"
+        :name="`${ev}_source`"
+        placeholder="Acte, registre, ou lien https://…"
+        autocapitalize="off"
+        autocomplete="off"
+        spellcheck="false"
+        @input="maj('source', ($event.target as HTMLInputElement).value)"
+      />
     </label>
     </div>
   </fieldset>

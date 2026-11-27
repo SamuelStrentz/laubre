@@ -30,6 +30,7 @@ const dates = computed(() => {
 function evenement(ev: Evenement): string {
   if (!i.value) return ''
   const x = i.value
+  if (x.sansObjet.includes(ev)) return 'Non renseigné'
   const lieu = [x[`${ev}_ville`], x[`${ev}_cp`] && `(${x[`${ev}_cp`]})`].filter(Boolean).join(' ')
   return [x[`${ev}_date`], lieu].filter(Boolean).join(' · ') || '—'
 }
@@ -42,6 +43,9 @@ const parents = computed(() => {
     .map(nomComplet)
     .join(', ') || '—'
 })
+
+/** Lien cliquable si la source est une adresse web. */
+const estLien = (t: string) => /^https?:\/\/\S+$/i.test(t.trim())
 
 const prenoms = computed(() => (i.value ? [i.value.prenom2, i.value.prenom3].filter(Boolean).join(', ') : ''))
 
@@ -79,13 +83,21 @@ function surAppuiFiche(e: MouseEvent) {
         <header>
           <h2>{{ nomComplet(i) }}<span v-if="i.souche" class="etoile"> ★</span></h2>
           <p v-if="prenoms" class="prenoms">{{ prenoms }}</p>
+          <p v-if="i.profession" class="profession">{{ i.profession }}</p>
           <p class="dates">{{ dates }}</p>
         </header>
         <hr />
         <dl>
           <template v-for="ev in EVENEMENTS" :key="ev">
             <dt>{{ TITRES_EVT[ev] }}</dt>
-            <dd>{{ evenement(ev) }}</dd>
+            <dd>
+              <span :class="{ discret: i.sansObjet.includes(ev) }">{{ evenement(ev) }}</span>
+              <span v-if="i[`${ev}_source`]" class="source">
+                <svg class="coche" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Source vérifiée"><path d="M5 12l5 5 9-10" /></svg>
+                <a v-if="estLien(i[`${ev}_source`])" :href="i[`${ev}_source`].trim()" target="_blank" rel="noopener noreferrer">{{ i[`${ev}_source`] }}</a>
+                <span v-else>{{ i[`${ev}_source`] }}</span>
+              </span>
+            </dd>
           </template>
           <dt>Parents</dt>
           <dd>{{ parents }}</dd>
@@ -157,6 +169,32 @@ h2 {
   margin: 0;
   font-size: 0.85rem;
   color: var(--discret);
+}
+.profession {
+  margin: 0;
+  font-size: 0.9rem;
+  font-style: italic;
+  color: var(--sapin);
+}
+.discret {
+  color: var(--discret);
+}
+.source {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin-top: 3px;
+  font-size: 0.78rem;
+  color: #5e7a6b;
+  overflow-wrap: anywhere;
+}
+.coche {
+  flex: none;
+  margin-top: 2px;
+  color: #2e9e5b;
+}
+.source a {
+  color: var(--sapin);
 }
 .dates {
   margin: 0;

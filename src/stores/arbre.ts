@@ -4,10 +4,11 @@ import { computed, ref } from 'vue'
 import { api } from '@/db/client'
 import { useDossierStore } from './dossier'
 import type { InfoStockage, Individu, Saisie, Statistiques } from '@/domain/individu'
+import type { Evenement } from '@/db/schema'
 
 const CLE_BASE = 'laubre.base'
 
-export type Ecran = 'generations' | 'arbre' | 'profil'
+export type Ecran = 'generations' | 'arbre' | 'profil' | 'stats'
 
 export const useArbreStore = defineStore('arbre', () => {
   const chargement = ref(true)
@@ -104,18 +105,26 @@ export const useArbreStore = defineStore('arbre', () => {
   const apresEcriture = () => useDossierStore().planifier()
 
   // --------------------------------------------------------- individus
-  async function ajouter(d: Partial<Saisie>, estSouche = false) {
-    const { id, info } = await api.ajouter(d, estSouche)
+  async function ajouter(d: Partial<Saisie>, estSouche = false, sansObjet: Evenement[] = []) {
+    const { id, info } = await api.ajouter(d, estSouche, sansObjet)
     appliquer(info)
     await recharger()
     apresEcriture()
     return id
   }
 
-  async function modifier(id: number, d: Partial<Saisie>) {
-    await api.modifier(id, d)
+  async function modifier(id: number, d: Partial<Saisie>, sansObjet: Evenement[] = []) {
+    await api.modifier(id, d, sansObjet)
     await recharger()
     apresEcriture()
+  }
+
+  /** Import GEDCOM : ajoute uniquement les nouveaux individus (cf. domain/gedcom.ts). */
+  async function ajouterLot(lot: { saisie: Partial<Saisie> }[]) {
+    const n = await api.ajouterLot(lot)
+    await recharger()
+    apresEcriture()
+    return n
   }
 
   async function supprimer(id: number) {
@@ -128,7 +137,7 @@ export const useArbreStore = defineStore('arbre', () => {
     chargement, erreur, stockage, individus, noms, stats, ecran, centre,
     prete, aSouche, nomBase, parNiveau, souche, niveauSouche,
     demarrer, recharger, creer, ouvrir, importer, importerOctets, remplacer, exporter,
-    ajouter, modifier, supprimer,
+    ajouter, modifier, ajouterLot, supprimer,
   }
 })
 

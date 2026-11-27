@@ -11,6 +11,8 @@ import BarreEcrans from '@/components/BarreEcrans.vue'
 import EcranArbre from '@/components/EcranArbre.vue'
 import EcranGenerations from '@/components/EcranGenerations.vue'
 import EcranProfil from '@/components/EcranProfil.vue'
+import EcranStats from '@/components/EcranStats.vue'
+import Recherche from '@/components/Recherche.vue'
 import FicheIndividu from '@/components/FicheIndividu.vue'
 import Initialisation from '@/components/Initialisation.vue'
 import { useArbreStore, type Ecran } from '@/stores/arbre'
@@ -22,7 +24,8 @@ const logo = `${import.meta.env.BASE_URL}icons/icon.svg`
 
 const pret = computed(() => store.prete && store.aSouche)
 const ecran = computed<Ecran>({ get: () => store.ecran, set: (e) => (store.ecran = e) })
-const position = computed(() => ['generations', 'arbre', 'profil'].indexOf(store.ecran))
+const position = computed(() => ['generations', 'arbre', 'profil', 'stats'].indexOf(store.ecran))
+const rechercheOuverte = ref(false)
 const horsSouche = computed(() => !!store.centre && store.centre !== store.niveauSouche && store.parNiveau.has(store.centre))
 
 // ------------------------------------------------------------ fiche flottante
@@ -81,9 +84,10 @@ watch(
   <div v-else class="accueil">
     <header class="entete">
       <img :src="logo" alt="" width="30" height="30" />
-      <span class="marque">Laubre</span>
+      <span class="marque" :class="{ cachee: rechercheOuverte }">Laubre</span>
+      <Recherche @ouverte="(o) => (rechercheOuverte = o)" />
       <Transition name="fondu">
-        <button v-if="ecran === 'arbre' && horsSouche" class="souche" @click="revenirSouche">
+        <button v-if="ecran === 'arbre' && horsSouche && !rechercheOuverte" class="souche" @click="revenirSouche">
           <Icone nom="souche" :taille="14" /> Souche
         </button>
       </Transition>
@@ -99,6 +103,9 @@ watch(
         </div>
         <div class="panneau" :inert="ecran !== 'profil'">
           <EcranProfil />
+        </div>
+        <div class="panneau" :inert="ecran !== 'stats'">
+          <EcranStats v-if="ecran === 'stats'" />
         </div>
       </div>
     </div>
@@ -131,14 +138,22 @@ watch(
   padding: calc(var(--haut-sur) + 12px) 20px 6px;
 }
 .marque {
-  flex: 1;
+  flex: none;
+  max-width: 120px;
+  overflow: hidden;
+  transition: max-width 0.25s ease, opacity 0.2s;
   font-family: var(--serif);
   font-size: 1.4rem;
   font-weight: 500;
   color: var(--sapin);
   letter-spacing: 0.01em;
 }
+.marque.cachee {
+  max-width: 0;
+  opacity: 0;
+}
 .souche {
+  flex: none;
   min-height: 36px;
   padding: 0 14px;
   border-radius: 18px;

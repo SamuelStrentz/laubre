@@ -12,6 +12,7 @@ import sqlite3InitModule, { type SAHPoolUtil, type Sqlite3Static } from '@sqlite
 import { SqlDb } from './sql'
 import * as arbre from '@/repositories/arbre'
 import type { InfoStockage, Saisie } from '@/domain/individu'
+import type { Evenement } from './schema'
 
 const FICHIER_IMPORT = '/__import__.db'
 
@@ -197,13 +198,15 @@ const api = {
   defauts: (niveau: string) => arbre.defauts(base(), niveau),
   niveauExiste: (niveau: string, exclureId: number | null) => arbre.niveauExiste(base(), niveau, exclureId),
   stats: () => arbre.statistiques(base()),
+  statsDetaillees: () => arbre.statistiquesDetaillees(base()),
 
   // --- Écriture (enregistrée immédiatement)
-  ajouter(d: Partial<Saisie>, souche: boolean) {
-    const id = arbre.ajouter(base(), d, souche)
+  ajouter(d: Partial<Saisie>, souche: boolean, sansObjet: Evenement[] = []) {
+    const id = arbre.ajouter(base(), d, souche, sansObjet)
     return { id, info: info() }
   },
-  modifier: (id: number, d: Partial<Saisie>) => arbre.modifier(base(), id, d),
+  modifier: (id: number, d: Partial<Saisie>, sansObjet: Evenement[] = []) => arbre.modifier(base(), id, d, sansObjet),
+  ajouterLot: (lot: { saisie: Partial<Saisie> }[]) => arbre.ajouterLot(base(), lot),
   supprimer: (id: number) => arbre.supprimer(base(), id),
 }
 

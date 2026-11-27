@@ -1,15 +1,15 @@
 <script setup lang="ts">
 /**
  * Zone de swipe en bas de l'écran. Le doigt va vers l'écran visé
- * (même logique que le menu d'Œnoleptica) : ← Générations, → Profil.
+ * (même logique que le menu d'Œnoleptica) : ← Générations, → Profil, puis Stats.
  * Les trois libellés restent touchables.
  */
 import type { Ecran } from '@/stores/arbre'
 import { vibrer } from '@/stores/ui'
 
 const ecran = defineModel<Ecran>({ required: true })
-const ORDRE: Ecran[] = ['generations', 'arbre', 'profil']
-const LIBELLES: Record<Ecran, string> = { generations: 'Générations', arbre: 'Arbre', profil: 'Profil' }
+const ORDRE: Ecran[] = ['generations', 'arbre', 'profil', 'stats']
+const LIBELLES: Record<Ecran, string> = { generations: 'Générations', arbre: 'Arbre', profil: 'Profil', stats: 'Stats' }
 const SEUIL = 40 // px
 
 let depart: { x: number; y: number } | null = null
@@ -76,19 +76,19 @@ function surRelache(e: PointerEvent) {
 }
 .piste {
   position: relative;
-  width: min(100%, 320px);
+  width: min(100%, 360px);
   height: 46px;
   padding: 4px;
   border-radius: 23px;
   background: #e8efea;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 .curseur {
   position: absolute;
   top: 4px;
   left: 4px;
-  width: calc((100% - 8px) / 3);
+  width: calc((100% - 8px) / 4);
   height: 38px;
   border-radius: 19px;
   background: var(--sapin);
@@ -98,8 +98,9 @@ function surRelache(e: PointerEvent) {
 .piste button {
   position: relative;
   z-index: 1;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 500;
+  letter-spacing: -0.01em;
   color: #5e7a6b;
   transition: color 0.3s;
 }

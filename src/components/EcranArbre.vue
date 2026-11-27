@@ -77,6 +77,15 @@ const traits = computed(() => {
   return { pleins, pointilles }
 })
 
+/** Conjoint(e) de la personne au centre : même préfixe, dernier chiffre inversé (00 <-> 01). */
+const conjoint = computed(() => {
+  const c = centre.value
+  const n = c.slice(0, -1) + (c.endsWith('0') ? '1' : '0')
+  return individuDe(n) ? n : null
+})
+/** Côté de la flèche : le mari à gauche de sa femme (comme les parents au-dessus). */
+const conjointADroite = computed(() => centre.value.endsWith('0'))
+
 const enfant = computed(() => (centre.value.length > 1 && centre.value !== store.niveauSouche ? centre.value.slice(0, -1) : null))
 const libelleGeneration = computed(() =>
   centre.value === store.niveauSouche ? `La souche · niveau ${centre.value}` : `Génération ${centre.value.length - 1} · niveau ${centre.value}`,
@@ -171,6 +180,20 @@ const role = (n: string) => (n.endsWith('0') ? 'Père' : 'Mère')
         </template>
       </div>
 
+      <!-- Flèche vers le conjoint -->
+      <button
+        v-if="conjoint && individuDe(conjoint)"
+        class="vers-conjoint"
+        :class="conjointADroite ? 'a-droite' : 'a-gauche'"
+        :style="{ left: `${g.xc + (conjointADroite ? RC + 14 : -RC - 14)}px`, top: `${g.yc}px` }"
+        :aria-label="`Aller au conjoint : ${individuDe(conjoint)!.prenom1} ${individuDe(conjoint)!.nom}`"
+        @click="recentrer(conjoint)"
+      >
+        <Icone v-if="!conjointADroite" nom="gauche" :taille="14" />
+        <span>{{ individuDe(conjoint)!.prenom1 || individuDe(conjoint)!.nom }}</span>
+        <Icone v-if="conjointADroite" nom="droite" :taille="14" />
+      </button>
+
       <!-- Bulle centrale -->
       <div class="noeud grand" :style="{ left: `${g.xc}px`, top: `${g.yc - RC}px` }">
         <button
@@ -249,10 +272,14 @@ const role = (n: string) => (n.endsWith('0') ? 'Père' : 'Mère')
 }
 .noeud {
   position: absolute;
+  pointer-events: none; /* seule la bulle et ses libellés captent les appuis */
   transform: translateX(-50%);
   display: grid;
   justify-items: center;
   text-align: center;
+}
+.noeud > * {
+  pointer-events: auto;
 }
 .petit {
   width: 84px;
@@ -344,6 +371,29 @@ const role = (n: string) => (n.endsWith('0') ? 'Père' : 'Mère')
   font-size: 0.82rem;
   color: #5e7a6b;
 }
+.vers-conjoint {
+  position: absolute;
+  z-index: 2;
+  min-height: 44px;
+  max-width: 34vw;
+  padding: 0 10px;
+  border-radius: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  color: #5e7a6b;
+  transform: translateY(-50%);
+}
+.vers-conjoint span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vers-conjoint.a-gauche {
+  transform: translate(-100%, -50%);
+}
+.vers-conjoint:active,
 .vers-enfant:active {
   background: var(--accent-clair);
 }

@@ -2,11 +2,13 @@
 /** Profil : chiffres de l'arbre, complétude, base de données, dossier local, installation. */
 import { computed, onBeforeUnmount, ref } from 'vue'
 import Icone from './Icone.vue'
+import ImportGedcom from './ImportGedcom.vue'
 import { useArbreStore } from '@/stores/arbre'
 import { useDossierStore } from '@/stores/dossier'
 import { useUiStore } from '@/stores/ui'
 import { nomComplet } from '@/domain/individu'
 import { nomFichier, partagerOuTelecharger } from '@/utils/fichiers'
+import { analyserGedcom, decoderGedcom, exporterGedcom, type Gedcom } from '@/domain/gedcom'
 
 const store = useArbreStore()
 const dossier = useDossierStore()
@@ -49,6 +51,30 @@ async function importer(e: Event) {
   champ.value = ''
   if (!f) return
   await agir(() => store.importer(f), `Base « ${f.name} » ouverte`)
+}
+
+// ------------------------------------------------------------------ GEDCOM
+const fichierGed = ref<HTMLInputElement>()
+const ged = ref<Gedcom | null>(null)
+const nomGed = ref('')
+
+async function exporterGed() {
+  await agir(async () => {
+    const texte = exporterGedcom(store.individus, version)
+    const jour = new Date().toISOString().slice(0, 10)
+    await partagerOuTelecharger(new Blob([texte], { type: 'text/plain' }), `${nomFichier(store.nomBase)}_${jour}.ged`, `Arbre ${store.nomBase} (GEDCOM)`)
+  })
+}
+
+async function lireGed(e: Event) {
+  const champ = e.target as HTMLInputElement
+  const f = champ.files?.[0]
+  champ.value = ''
+  if (!f) return
+  await agir(async () => {
+    ged.value = analyserGedcom(decoderGedcom(new Uint8Array(await f.arrayBuffer())))
+    nomGed.value = f.name
+  })
 }
 
 // ------------------------------------------------------------ installation
@@ -103,6 +129,15 @@ async function installer() {
       </div>
     </div>
 
+    <h2 class="section-titre">Actes sourcés</h2>
+    <div class="carte completude">
+      <p v-if="!(store.stats?.sources.length)" class="aide sans-donnees">Aucun acte renseigné pour l'instant.</p>
+      <div v-for="c in store.stats?.sources ?? []" :key="c.champ" class="jauge">
+        <p><span>{{ c.champ }}</span><span>{{ Math.round(c.pourcentage) }} % · {{ c.renseignes }}/{{ c.total }}</span></p>
+        <div class="barre-fond"><div class="barre-plein" :style="{ width: `${c.pourcentage}%` }"></div></div>
+      </div>
+    </div>
+
     <h2 class="section-titre">Dossier local</h2>
     <div class="carte bloc">
       <template v-if="dossier.etat === 'non-supporte'">
@@ -148,6 +183,15 @@ async function installer() {
       </template>
       <input ref="fichier" type="file" accept=".db,.sqlite,.sqlite3,application/octet-stream,application/vnd.sqlite3,application/x-sqlite3" hidden @change="importer" />
     </div>
+
+    <h2 class="section-titre">GEDCOM</h2>
+    <div class="carte bloc">
+      <p class="aide">Format standard d'échange (Geneanet, Genebase, Heredis…). À l'import, seuls les nouveaux individus de votre lignée sont ajoutés : ceux déjà présents restent tels quels.</p>
+      <button class="btn btn-large" @click="exporterGed"><Icone nom="partager" :taille="20" /> Exporter en GEDCOM (.ged)</button>
+      <button class="btn btn-large" @click="fichierGed?.click()"><Icone nom="importer" :taille="20" /> Importer un GEDCOM</button>
+      <input ref="fichierGed" type="file" accept=".ged,.gedcom,text/plain,application/octet-stream" hidden @change="lireGed" />
+    </div>
+    <ImportGedcom :ged="ged" :nom-fichier="nomGed" @fermer="ged = null" />
 
     <button v-if="!installee" class="btn btn-large installer" @click="installer">
       <Icone nom="installer" :taille="20" /> Installer l'application
@@ -242,6 +286,9 @@ h1 {
   border-radius: 3px;
   background: var(--sapin);
   transition: width 0.4s ease;
+}
+.sans-donnees {
+  margin: 0;
 }
 .bloc {
   display: grid;

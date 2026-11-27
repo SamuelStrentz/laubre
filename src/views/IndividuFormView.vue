@@ -49,7 +49,7 @@ const nomsConnus = computed<OptionListe[]>(() =>
 
 /** Événements renseignés (pastille verte) ou non (grise : bloc replié, rien d'enregistré). */
 const actifs = ref<Record<Evenement, boolean>>({ naissance: true, mariage: true, deces: true })
-const aDesDonnees = (i: Saisie, ev: Evenement) => CHAMPS_EVT.some((c) => i[`${ev}_${c}`].trim() !== '')
+
 
 // ---------------------------------------------------------- valeurs proposées
 /** Valeurs posées automatiquement (pour savoir ce qu'on peut remplacer). */
@@ -92,7 +92,8 @@ onMounted(async () => {
     }
     individu.value = i
     s.value = nettoyer(i)
-    for (const ev of EVENEMENTS) actifs.value[ev] = aDesDonnees(s.value, ev)
+    // pastille grise = événement déclaré « non renseigné » (enregistré dans la base)
+    for (const ev of EVENEMENTS) actifs.value[ev] = !i.sansObjet.includes(ev)
   } else {
     const n = typeof route.query.niveau === 'string' ? route.query.niveau : nouvelleSouche.value ? '0' : ''
     s.value = { ...saisieVide(), niveau: n }
@@ -105,8 +106,9 @@ async function enregistrer() {
   const d = nettoyer(s.value)
   d.nom = d.nom.toLocaleUpperCase('fr-FR')
   for (const k of CLES_DATES) d[k] = finaliserDate(d[k])
-  // événement désactivé : rien d'enregistré pour lui
-  for (const ev of EVENEMENTS) if (!actifs.value[ev]) for (const c of CHAMPS_EVT) d[`${ev}_${c}`] = ''
+  // événement désactivé : rien d'enregistré pour lui, il est marqué « non renseigné »
+  const sansObjet = EVENEMENTS.filter((ev) => !actifs.value[ev])
+  for (const ev of sansObjet) for (const c of CHAMPS_EVT) d[`${ev}_${c}`] = ''
   const e = new Set<string>()
   if (!d.niveau || !RE_NIVEAU.test(d.niveau)) e.add('niveau')
   if (!d.prenom1 && !d.nom) e.add('prenom1')
@@ -116,7 +118,7 @@ async function enregistrer() {
   if (e.has('prenom1')) return ui.toast('Renseigne au moins un premier prénom ou un nom de famille.', 'erreur')
   if (e.size) return ui.toast('Date invalide : JJ/MM/AAAA, MM/AAAA ou AAAA.', 'erreur')
 
-  if (await api.niveauExiste(d.niveau, individu.value?.id ?? null)) {
+  if (!individu.value && (await api.niveauExiste(d.niveau, null))) {
     if (!confirm(`Le niveau ${d.niveau} est déjà utilisé par un autre individu.\nEnregistrer quand même ?`)) return
   }
   if (nouvelleSouche.value && d.niveau !== '0') {
@@ -126,10 +128,10 @@ async function enregistrer() {
   enCours.value = true
   try {
     if (individu.value) {
-      await store.modifier(individu.value.id, d)
+      await store.modifier(individu.value.id, d, sansObjet)
       ui.toast('Modifications enregistrées')
     } else {
-      await store.ajouter(d, souche)
+      await store.ajouter(d, souche, sansObjet)
       ui.toast(souche ? 'Votre arbre est planté 🌲' : `${nomComplet(d)} ajouté${d.niveau.endsWith('1') ? 'e' : ''}`)
     }
     if (souche || !store.centre) store.centre = store.niveauSouche
@@ -177,10 +179,14 @@ const tousLesChampsDates = EVENEMENTS
     <form novalidate @submit.prevent="enregistrer">
       <section class="carte identite">
         <div class="niveau">
-          <label class="champ" :class="{ invalide: erreurs.has('niveau') || aide.erreur }">
+          <label v-if="!modification" class="champ" :class="{ invalide: erreurs.has('niveau') || aide.erreur }">
             <span>Niveau *</span>
             <input v-model.trim="s.niveau" name="niveau" inputmode="numeric" autocomplete="off" maxlength="30" />
           </label>
+          <div v-else class="champ">
+            <span>Niveau</span>
+            <p class="niveau-fixe" aria-label="Niveau, non modifiable">{{ s.niveau }}</p>
+          </div>
           <p class="aide-niveau" :class="{ erreur: aide.erreur }">{{ aide.texte || '0 = homme, 1 = femme (00 = père, 01 = mère)' }}</p>
         </div>
         <label class="champ" :class="{ invalide: erreurs.has('prenom1') }">
@@ -195,6 +201,10 @@ const tousLesChampsDates = EVENEMENTS
           <span>Nom de famille</span>
           <ChampListe v-model="s.nom" name="nom" :options="nomsConnus" titre-liste="Noms de l'arbre" placeholder="NOM DE FAMILLE" majuscules />
         </div>
+        <label class="champ dernier profession">
+          <span>Profession</span>
+          <input v-model="s.profession" name="profession" autocapitalize="sentences" autocomplete="off" @input="touche('profession')" />
+        </label>
       </section>
 
       <ChampsEvenement v-for="ev in tousLesChampsDates" :key="ev" v-model="s" v-model:actif="actifs[ev]" :ev="ev" @touche="touche" />
@@ -234,6 +244,21 @@ import { ANCIENNES_REGIONS } from '@/domain/regions'
   grid-template-columns: 112px minmax(0, 1fr);
   gap: 12px;
   align-items: end;
+}
+.niveau-fixe {
+  margin: 0;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--accent-clair);
+  font-family: var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--sapin);
+}
+.profession {
+  margin-top: 12px;
 }
 .niveau input {
   font-family: var(--mono);

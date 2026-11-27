@@ -14,6 +14,7 @@ Une même base `.db` s'ouvre donc dans Laubre, dans le logiciel PC et dans DB Br
 | Base | SQLite WASM officiel (`@sqlite.org/sqlite-wasm`) dans un Web Worker, stockage OPFS « SAHPool » |
 | Dossier local | API File System Access : copie automatique de la base dans `<dossier>/db/<nom>.db` |
 | Lieux | geo.api.gouv.fr (ville ↔ code postal, département), **anciennes régions** (avant 2016) |
+| Échange | GEDCOM 5.5.1 (import / export), sans dépendance |
 | État | Pinia |
 | Tests | Vitest (couche base de données) |
 | Hébergement | GitHub Pages via GitHub Actions |
@@ -24,7 +25,8 @@ Une même base `.db` s'ouvre donc dans Laubre, dans le logiciel PC et dans DB Br
 src/
 ├── db/            schema.ts (CREATE identiques au logiciel PC), sql.ts, worker.ts, client.ts (RPC)
 ├── repositories/  arbre.ts : portage de la classe Base (familles, valeurs proposées, statistiques)
-├── domain/        individu.ts (dates, niveau, saisie), regions.ts (anciennes régions)
+├── domain/        individu.ts (dates, niveau, saisie), regions.ts (anciennes régions),
+│                  departements.ts, gedcom.ts (lecture, import « l'appli prévaut », export)
 ├── services/      dossier-local.ts (dossier du téléphone)
 ├── stores/        arbre (données + navigation), dossier (copie / version plus récente), ui (toasts)
 ├── components/    EcranArbre, EcranGenerations, EcranProfil, BarreEcrans (zone de swipe),
@@ -40,13 +42,28 @@ tests/             tests Vitest sur une base en mémoire
 - **Arbre** (écran d'accueil, toujours ouvert sur la souche) : appui sur un parent ou un grand-parent = il passe au centre ;
   appui sur la bulle verte du centre, ou double appui sur n'importe quelle bulle = fiche flottante (bouton « Modifier ») ;
   bulle « + » = ajouter l'individu manquant.
-- **Zone de swipe** en bas : le doigt va vers l'écran voulu — ← Générations, → Profil (les libellés sont aussi touchables).
+- **Zone de swipe** en bas : le doigt va vers l'écran voulu — Générations · Arbre · Profil · Stats (les libellés sont aussi touchables).
+- **Flèche latérale** à côté de la bulle centrale : passe au conjoint (00 ↔ 01).
+- **Recherche** discrète en haut : prénom / nom, la personne choisie passe au centre de l'arbre.
 - **Générations** : vignettes regroupées par couple (famille), appui = fiche, « Modifier » = saisie.
 - **Saisie** : nom de famille en MAJUSCULES, au choix dans la liste des noms de la base ; dates avec « / » automatiques
   (JJ/MM/AAAA, MM/AAAA ou AAAA) ; pastille verte / grise sur Naissance, Mariage, Décès pour renseigner ou non
   l'événement (grise = bloc replié, rien d'enregistré) ; ville ou code postal → CP, département,
   ancienne région, pays ; à l'ajout, valeurs proposées comme le logiciel PC (lieux de l'enfant, mariage du conjoint).
+- **Profession** et **source** par événement (acte, registre ou lien https://) ; une source = coche verte dans la fiche.
+- Le **niveau** n'est modifiable qu'à la création.
+- **Profil** : complétude (un événement « non renseigné » compte comme complet), part des actes sourcés,
+  import / export **GEDCOM**. À l'import, seuls les nouveaux individus de la lignée de la souche sont ajoutés :
+  un individu déjà présent n'est ni remplacé ni complété, les écarts de dates sont ignorés.
+- **Stats** : répartition par département, région, pays, ville ; âge moyen au décès par génération, au mariage ;
+  naissances par décennie ; prénoms et noms fréquents.
 - Chaque modification est enregistrée tout de suite, puis copiée dans le dossier lié.
+
+## Compatibilité avec le logiciel PC
+
+Les ajouts de Laubre restent lisibles par le logiciel PC, qui les ignore :
+colonne `identite.profession` et table `evenement_info` (source et « non renseigné » de chaque événement).
+Le logiciel PC conserve ces données quand il modifie un individu.
 
 ## Développement
 

@@ -1,7 +1,7 @@
 /** Types et règles métier (portage du logiciel Python). */
 import { CHAMPS_EVT, EVENEMENTS, type ChampEvt, type Evenement } from '@/db/schema'
 
-export const CHAMPS_IDENTITE = ['niveau', 'prenom1', 'prenom2', 'prenom3', 'nom'] as const
+export const CHAMPS_IDENTITE = ['niveau', 'prenom1', 'prenom2', 'prenom3', 'nom', 'profession'] as const
 export type CleEvt = `${Evenement}_${ChampEvt}`
 export type Cle = (typeof CHAMPS_IDENTITE)[number] | CleEvt
 export const TOUTES_CLES: Cle[] = [
@@ -17,6 +17,8 @@ export interface Individu extends Saisie {
   id: number
   souche: boolean
   famille: number | null
+  /** Événements déclarés « non renseignés » (pastille grise) : ex. décès d'une personne vivante. */
+  sansObjet: Evenement[]
 }
 
 export interface InfoStockage {
@@ -29,11 +31,41 @@ export interface InfoStockage {
   souche: boolean
 }
 
+export interface LigneJauge {
+  champ: string
+  renseignes: number
+  total: number
+  pourcentage: number
+}
+
 export interface Statistiques {
   individus: number
   familles: number
   generations: number
-  completude: { champ: string; renseignes: number; total: number; pourcentage: number }[]
+  completude: LigneJauge[]
+  /** Part des actes (événements renseignés) qui ont une source. */
+  sources: LigneJauge[]
+}
+
+export interface Barre {
+  libelle: string
+  valeur: number
+  detail?: string
+}
+
+export interface StatsDetaillees {
+  hommes: number
+  femmes: number
+  parGeneration: Barre[]
+  departements: Barre[]
+  regions: Barre[]
+  pays: Barre[]
+  villes: Barre[]
+  ageDeces: Barre[]
+  ageMariage: Barre[]
+  decennies: Barre[]
+  prenoms: Barre[]
+  noms: Barre[]
 }
 
 export const RE_NIVEAU = /^[01]+$/
