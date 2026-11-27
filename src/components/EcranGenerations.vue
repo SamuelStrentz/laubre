@@ -5,7 +5,6 @@
  * comme le logiciel PC), une vignette par individu.
  */
 import { computed } from 'vue'
-import Icone from './Icone.vue'
 import BulleIcone from './BulleIcone.vue'
 import { useArbreStore } from '@/stores/arbre'
 import { useAppuiLong } from '@/composables/useAppuiLong'
@@ -47,12 +46,15 @@ const generations = computed(() => {
     const prefixes = new Set(niveaux.filter((n) => n.length === L).map((n) => n.slice(0, -1)))
     // individus de la génération précédente sans aucun parent : place libre (jusqu'à la dernière génération existante)
     if (L > 1) for (const n of niveaux) if (n.length === L - 1) prefixes.add(n)
-    const familles = [...prefixes].sort().map<Famille>((p) => {
+    const familles = [...prefixes]
+      .filter((p) => store.visible(p + '0')) // belle-famille masquée par défaut
+      .sort()
+      .map<Famille>((p) => {
       const places = [p + '0', p + '1'].map((n) => ({ niveau: n, individu: store.parNiveau.get(n) ?? null, libelleAjout: libelleAjout(n) }))
       const numero = places.map((x) => x.individu?.famille).find((f) => f) ?? null
       return { prefixe: p, titre: p === '' ? 'Souche et conjoint·e' : `Parents de ${nomDe(p)}`, numero, places }
     })
-    resultat.push({ numero: L - 1, familles })
+    if (familles.length) resultat.push({ numero: L - 1, familles })
   }
   return resultat
 })
@@ -72,7 +74,16 @@ function detail(i: Individu): string {
         <h1>Générations</h1>
         <p>{{ store.stats?.individus ?? 0 }} individus · {{ store.stats?.familles ?? 0 }} familles</p>
       </div>
-      <button class="btn ajouter" @click="emit('ajouter', '')"><Icone nom="plus" :taille="18" /> Ajouter</button>
+      <button
+        class="belle-famille"
+        role="switch"
+        :aria-checked="store.belleFamille"
+        aria-label="Afficher la famille de la conjointe"
+        @click="store.afficherBelleFamille(!store.belleFamille)"
+      >
+        <span class="texte">Belle-famille</span>
+        <span class="pastille"></span>
+      </button>
     </header>
 
     <section v-for="gen in generations" :key="gen.numero" class="groupe">
@@ -130,10 +141,34 @@ function detail(i: Individu): string {
   font-size: 0.82rem;
   color: var(--discret);
 }
-.ajouter {
-  min-height: 40px;
-  padding: 0 14px;
-  font-size: 0.88rem;
+.belle-famille {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 0 10px;
+  border-radius: 22px;
+  font-size: 0.8rem;
+  color: #5e7a6b;
+}
+.belle-famille:active {
+  background: var(--accent-clair);
+}
+/* même pastille que les blocs Naissance / Mariage / Décès */
+.pastille {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: #b9c2bd;
+  box-shadow: 0 0 0 3px rgb(185 194 189 / 25%);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.belle-famille[aria-checked='true'] .pastille {
+  background: #2e9e5b;
+  box-shadow: 0 0 0 3px rgb(46 158 91 / 18%);
+}
+.belle-famille[aria-checked='true'] .texte {
   color: var(--sapin);
 }
 /* Séparateur de génération : petites capitales entre deux filets fondus */

@@ -1,27 +1,32 @@
 <script setup lang="ts">
 /** Statistiques en graphiques (requêtes du logiciel PC) : lieux, âges, générations, prénoms… */
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import GraphBarres from './GraphBarres.vue'
 import GraphColonnes from './GraphColonnes.vue'
 import { api } from '@/db/client'
 import { useUiStore } from '@/stores/ui'
+import { useArbreStore } from '@/stores/arbre'
 import type { StatsDetaillees } from '@/domain/individu'
 
 const ui = useUiStore()
+const store = useArbreStore()
 const s = ref<StatsDetaillees | null>(null)
 
-onMounted(async () => {
+async function charger() {
   try {
-    s.value = await api.statsDetaillees()
+    s.value = await api.statsDetaillees(store.belleFamille)
   } catch (e) {
     ui.erreur(e)
   }
-})
+}
+onMounted(charger)
+watch(() => store.belleFamille, charger)
 </script>
 
 <template>
   <section class="ecran-stats">
     <h1>Statistiques</h1>
+    <p class="portee">{{ store.belleFamille ? 'Avec la belle-famille' : 'Sans la belle-famille (réglage dans Générations)' }}</p>
     <template v-if="s">
       <div class="tuiles">
         <div class="carte"><strong>{{ s.hommes }}</strong><span>hommes</span></div>
@@ -57,7 +62,12 @@ onMounted(async () => {
 h1 {
   font-size: 1.5rem;
   color: var(--sapin);
-  margin: 4px 4px 2px;
+  margin: 4px 4px 0;
+}
+.portee {
+  margin: -8px 4px 2px;
+  font-size: 0.8rem;
+  color: var(--discret);
 }
 .section-titre {
   font-family: var(--sans);

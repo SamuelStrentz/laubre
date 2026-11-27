@@ -250,16 +250,35 @@ const jauge = (champ: string, renseignes: number, total: number): LigneJauge => 
 const sansObjet = (alias: string, ev: Evenement) =>
   `EXISTS (SELECT 1 FROM evenement_info x WHERE x.id = ${alias}.id AND x.evenement = '${ev}' AND x.sans_objet = 1)`
 
-export function statistiques(db: SqlDb): Statistiques {
-  const individus = db.valeur<number>('SELECT COUNT(*) FROM identite') ?? 0
-  const familles = db.valeur<number>('SELECT COUNT(DISTINCT numero_famille) FROM famille') ?? 0
-  const generations = db.valeur<number>('SELECT COUNT(DISTINCT length(niveau)) FROM identite') ?? 0
+/**
+ * Belle-famille : les ascendants de la conjointe (niveaux qui commencent par le sien, « 1 »,
+ * sauf elle-même). Sans « avecBelleFamille », ils sont exclus des statistiques.
+ * Retourne une condition SQL sur l'alias donné (niveau fait uniquement de 0 et de 1 : sans risque).
+ */
+export function niveauConjointe(db: SqlDb): string | null {
+  const souche = db.valeur<string>('SELECT niveau FROM identite WHERE souche = 1') ?? '0'
+  if (!RE_NIVEAU.test(souche)) return null
+  return souche.slice(0, -1) + (souche.endsWith('0') ? '1' : '0')
+}
+
+function filtreLignee(db: SqlDb, avecBelleFamille: boolean, alias = 'i'): string {
+  if (avecBelleFamille) return '1'
+  const c = niveauConjointe(db)
+  if (!c) return '1'
+  return `NOT (substr(${alias}.niveau, 1, ${c.length}) = '${c}' AND length(${alias}.niveau) > ${c.length})`
+}
+
+export function statistiques(db: SqlDb, avecBelleFamille = false): Statistiques {
+  const f = filtreLignee(db, avecBelleFamille)
+  const individus = db.valeur<number>(`SELECT COUNT(*) FROM identite i WHERE ${f}`) ?? 0
+  const familles = db.valeur<number>(`SELECT COUNT(DISTINCT fa.numero_famille) FROM famille fa JOIN identite i ON i.id = fa.id WHERE ${f}`) ?? 0
+  const generations = db.valeur<number>(`SELECT COUNT(DISTINCT length(i.niveau)) FROM identite i WHERE ${f}`) ?? 0
   // Complétude (requête « Qualité » du logiciel PC) : un événement déclaré « non renseigné »
   // (pastille grise, ex. décès d'une personne vivante) compte comme complet.
   const compter = (condition: string) =>
     db.valeur<number>(`SELECT COUNT(*) FROM identite i
       LEFT JOIN naissance n ON n.id = i.id LEFT JOIN mariage m ON m.id = i.id LEFT JOIN deces d ON d.id = i.id
-      WHERE ${condition}`) ?? 0
+      WHERE (${f}) AND (${condition})`) ?? 0
   const completude = individus
     ? [
         jauge('Date de naissance', compter(`n.annee IS NOT NULL OR ${sansObjet('i', 'naissance')}`), individus),
@@ -273,10 +292,11 @@ export function statistiques(db: SqlDb): Statistiques {
   let totalActes = 0
   let totalSources = 0
   for (const [ev, libelle] of [['naissance', 'Naissances'], ['mariage', 'Mariages'], ['deces', 'Décès']] as const) {
-    const acte = `(e.annee IS NOT NULL OR TRIM(COALESCE(e.ville, '')) <> '')`
-    const actes = db.valeur<number>(`SELECT COUNT(*) FROM ${ev} e WHERE ${acte}`) ?? 0
+    const acte = `(e.annee IS NOT NULL OR TRIM(COALESCE(e.ville, '')) <> '') AND ${f}`
+    const actes = db.valeur<number>(`SELECT COUNT(*) FROM ${ev} e JOIN identite i ON i.id = e.id WHERE ${acte}`) ?? 0
     const avec = db.valeur<number>(
-      `SELECT COUNT(*) FROM ${ev} e JOIN evenement_info x ON x.id = e.id AND x.evenement = '${ev}'
+      `SELECT COUNT(*) FROM ${ev} e JOIN identite i ON i.id = e.id
+       JOIN evenement_info x ON x.id = e.id AND x.evenement = '${ev}'
        WHERE ${acte} AND x.source <> ''`,
     ) ?? 0
     totalActes += actes
@@ -288,20 +308,21 @@ export function statistiques(db: SqlDb): Statistiques {
 }
 
 /** Statistiques détaillées (écran Stats) : reprises des requêtes du logiciel PC. */
-export function statistiquesDetaillees(db: SqlDb): StatsDetaillees {
+export function statistiquesDetaillees(db: SqlDb, avecBelleFamille = false): StatsDetaillees {
+  const f = filtreLignee(db, avecBelleFamille)
   const barres = (sql: string) =>
     db.all<{ libelle: string | number; valeur: number; detail?: string }>(sql).map((r) => ({
       libelle: String(r.libelle), valeur: Number(r.valeur), ...(r.detail ? { detail: String(r.detail) } : {}),
     }))
   const repartition = (champ: string, limite = 10): Barre[] =>
-    barres(`SELECT n.${champ} AS libelle, COUNT(*) AS valeur FROM naissance n
-            WHERE TRIM(COALESCE(n.${champ}, '')) <> '' GROUP BY n.${champ} COLLATE NOCASE
+    barres(`SELECT n.${champ} AS libelle, COUNT(*) AS valeur FROM naissance n JOIN identite i ON i.id = n.id
+            WHERE TRIM(COALESCE(n.${champ}, '')) <> '' AND ${f} GROUP BY n.${champ} COLLATE NOCASE
             ORDER BY valeur DESC, libelle LIMIT ${limite}`)
   return {
-    hommes: db.valeur<number>("SELECT COUNT(*) FROM identite WHERE substr(niveau, -1) = '0'") ?? 0,
-    femmes: db.valeur<number>("SELECT COUNT(*) FROM identite WHERE substr(niveau, -1) = '1'") ?? 0,
-    parGeneration: barres(`SELECT 'Génération ' || (length(niveau) - 1) AS libelle, COUNT(*) AS valeur
-                           FROM identite GROUP BY length(niveau) ORDER BY length(niveau)`),
+    hommes: db.valeur<number>(`SELECT COUNT(*) FROM identite i WHERE substr(i.niveau, -1) = '0' AND ${f}`) ?? 0,
+    femmes: db.valeur<number>(`SELECT COUNT(*) FROM identite i WHERE substr(i.niveau, -1) = '1' AND ${f}`) ?? 0,
+    parGeneration: barres(`SELECT 'Génération ' || (length(i.niveau) - 1) AS libelle, COUNT(*) AS valeur
+                           FROM identite i WHERE ${f} GROUP BY length(i.niveau) ORDER BY length(i.niveau)`),
     departements: repartition('departement'),
     regions: repartition('region'),
     pays: repartition('pays', 6),
@@ -310,21 +331,21 @@ export function statistiquesDetaillees(db: SqlDb): StatsDetaillees {
                         ROUND(AVG(d.annee - n.annee), 1) AS valeur,
                         COUNT(*) || ' pers. · ' || MIN(d.annee - n.annee) || ' à ' || MAX(d.annee - n.annee) || ' ans' AS detail
                       FROM identite i JOIN naissance n ON n.id = i.id JOIN deces d ON d.id = i.id
-                      WHERE n.annee IS NOT NULL AND d.annee IS NOT NULL
+                      WHERE n.annee IS NOT NULL AND d.annee IS NOT NULL AND ${f}
                       GROUP BY length(i.niveau) ORDER BY length(i.niveau)`),
     ageMariage: barres(`SELECT CASE substr(i.niveau, -1) WHEN '0' THEN 'Hommes' ELSE 'Femmes' END AS libelle,
                           ROUND(AVG(m.annee - n.annee), 1) AS valeur, COUNT(*) || ' pers.' AS detail
                         FROM identite i JOIN naissance n ON n.id = i.id JOIN mariage m ON m.id = i.id
-                        WHERE n.annee IS NOT NULL AND m.annee IS NOT NULL
+                        WHERE n.annee IS NOT NULL AND m.annee IS NOT NULL AND ${f}
                         GROUP BY substr(i.niveau, -1) ORDER BY substr(i.niveau, -1)`),
-    decennies: barres(`SELECT (n.annee / 10) * 10 AS libelle, COUNT(*) AS valeur FROM naissance n
-                       WHERE n.annee IS NOT NULL GROUP BY n.annee / 10 ORDER BY n.annee / 10`),
+    decennies: barres(`SELECT (n.annee / 10) * 10 AS libelle, COUNT(*) AS valeur FROM naissance n JOIN identite i ON i.id = n.id
+                       WHERE n.annee IS NOT NULL AND ${f} GROUP BY n.annee / 10 ORDER BY n.annee / 10`),
     prenoms: barres(`SELECT prenom AS libelle, COUNT(*) AS valeur FROM (
-                       SELECT prenom1 AS prenom FROM identite UNION ALL SELECT prenom2 FROM identite
-                       UNION ALL SELECT prenom3 FROM identite)
-                     WHERE TRIM(COALESCE(prenom, '')) <> '' GROUP BY prenom COLLATE NOCASE
+                       SELECT prenom1 AS prenom, niveau FROM identite UNION ALL SELECT prenom2, niveau FROM identite
+                       UNION ALL SELECT prenom3, niveau FROM identite) i
+                     WHERE TRIM(COALESCE(prenom, '')) <> '' AND ${f} GROUP BY prenom COLLATE NOCASE
                      ORDER BY valeur DESC, libelle LIMIT 10`),
-    noms: barres(`SELECT nom AS libelle, COUNT(*) AS valeur FROM identite WHERE nom <> ''
-                  GROUP BY nom COLLATE NOCASE ORDER BY valeur DESC, libelle LIMIT 10`),
+    noms: barres(`SELECT i.nom AS libelle, COUNT(*) AS valeur FROM identite i WHERE i.nom <> '' AND ${f}
+                  GROUP BY i.nom COLLATE NOCASE ORDER BY valeur DESC, libelle LIMIT 10`),
   }
 }

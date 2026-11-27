@@ -115,6 +115,7 @@ async function installer() {
       </div>
     </div>
 
+    <p class="portee">{{ store.belleFamille ? 'Chiffres avec la belle-famille' : 'Chiffres sans la belle-famille (réglage dans Générations)' }}</p>
     <div class="chiffres">
       <div class="carte"><strong>{{ store.stats?.individus ?? 0 }}</strong><span>individus</span></div>
       <div class="carte"><strong>{{ store.stats?.familles ?? 0 }}</strong><span>familles</span></div>
@@ -236,11 +237,16 @@ h1 {
   color: var(--discret);
   overflow-wrap: anywhere;
 }
+.portee {
+  margin: 12px 4px 0;
+  font-size: 0.8rem;
+  color: var(--discret);
+}
 .chiffres {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
-  margin-top: 12px;
+  margin-top: 8px;
 }
 .chiffres .carte {
   padding: 12px 8px;

@@ -22,6 +22,9 @@ export const useArbreStore = defineStore('arbre', () => {
   const ecran = ref<Ecran>('arbre')
   const centre = ref<string | null>(null)
 
+  /** Afficher la lignée de la conjointe (générations, profil, stats) : non par défaut, retenu par arbre. */
+  const belleFamille = ref(false)
+
   const prete = computed(() => stockage.value?.etat === 'prete')
   const aSouche = computed(() => !!stockage.value?.souche)
   const nomBase = computed(() => stockage.value?.base?.nom ?? 'arbre')
@@ -34,6 +37,30 @@ export const useArbreStore = defineStore('arbre', () => {
   })
   const souche = computed(() => individus.value.find((i) => i.souche) ?? parNiveau.value.get('0') ?? null)
   const niveauSouche = computed(() => souche.value?.niveau ?? '0')
+  /** Niveau de la conjointe (« 1 » pour la souche « 0 »). */
+  const niveauConjointe = computed(() => niveauSouche.value.slice(0, -1) + (niveauSouche.value.endsWith('0') ? '1' : '0'))
+  /** Ascendant de la conjointe (niveau qui commence par le sien, elle exceptée). */
+  const estBelleFamille = (n: string) => n.length > niveauConjointe.value.length && n.startsWith(niveauConjointe.value)
+  /** Visible dans les générations / profil / stats selon le réglage « belle-famille ». */
+  const visible = (n: string) => belleFamille.value || !estBelleFamille(n)
+
+  async function afficherBelleFamille(oui: boolean) {
+    belleFamille.value = oui
+    try {
+      localStorage.setItem(cleBelleFamille(), oui ? '1' : '0')
+    } catch {
+      /* sans importance */
+    }
+    if (prete.value) stats.value = await api.stats(oui)
+  }
+  const cleBelleFamille = () => `laubre.belleFamille.${stockage.value?.base?.fichier ?? ''}`
+  function lireBelleFamille() {
+    try {
+      belleFamille.value = localStorage.getItem(cleBelleFamille()) === '1'
+    } catch {
+      belleFamille.value = false
+    }
+  }
 
   // ------------------------------------------------------------- bases
   async function demarrer() {
@@ -73,7 +100,8 @@ export const useArbreStore = defineStore('arbre', () => {
   }
 
   async function recharger() {
-    const [i, n, s, info] = await Promise.all([api.individus(), api.noms(), api.stats(), api.info()])
+    lireBelleFamille()
+    const [i, n, s, info] = await Promise.all([api.individus(), api.noms(), api.stats(belleFamille.value), api.info()])
     individus.value = i
     noms.value = n
     stats.value = s
@@ -135,7 +163,8 @@ export const useArbreStore = defineStore('arbre', () => {
 
   return {
     chargement, erreur, stockage, individus, noms, stats, ecran, centre,
-    prete, aSouche, nomBase, parNiveau, souche, niveauSouche,
+    prete, aSouche, nomBase, parNiveau, souche, niveauSouche, niveauConjointe,
+    belleFamille, estBelleFamille, visible, afficherBelleFamille,
     demarrer, recharger, creer, ouvrir, importer, importerOctets, remplacer, exporter,
     ajouter, modifier, ajouterLot, supprimer,
   }

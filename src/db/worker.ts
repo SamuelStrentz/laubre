@@ -197,8 +197,8 @@ const api = {
   noms: () => arbre.noms(base()),
   defauts: (niveau: string) => arbre.defauts(base(), niveau),
   niveauExiste: (niveau: string, exclureId: number | null) => arbre.niveauExiste(base(), niveau, exclureId),
-  stats: () => arbre.statistiques(base()),
-  statsDetaillees: () => arbre.statistiquesDetaillees(base()),
+  stats: (avecBelleFamille = false) => arbre.statistiques(base(), avecBelleFamille),
+  statsDetaillees: (avecBelleFamille = false) => arbre.statistiquesDetaillees(base(), avecBelleFamille),
 
   // --- Écriture (enregistrée immédiatement)
   ajouter(d: Partial<Saisie>, souche: boolean, sansObjet: Evenement[] = []) {

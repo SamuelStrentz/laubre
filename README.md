@@ -46,6 +46,8 @@ tests/             tests Vitest sur une base en mémoire
 - **Flèche latérale** à côté de la bulle centrale : passe au conjoint (00 ↔ 01).
 - **Recherche** discrète en haut : prénom / nom, la personne choisie passe au centre de l'arbre.
 - **Générations** : vignettes regroupées par couple (famille), appui = fiche, « Modifier » = saisie.
+  Pastille **Belle-famille** (désactivée par défaut, retenue par arbre) : affiche ou non la lignée de la conjointe
+  (niveaux 10, 11, 100…) dans les générations, le profil et les stats. L'arbre reste toujours navigable.
 - **Saisie** : nom de famille en MAJUSCULES, au choix dans la liste des noms de la base ; dates avec « / » automatiques
   (JJ/MM/AAAA, MM/AAAA ou AAAA) ; pastille verte / grise sur Naissance, Mariage, Décès pour renseigner ou non
   l'événement (grise = bloc replié, rien d'enregistré) ; ville ou code postal → CP, département,

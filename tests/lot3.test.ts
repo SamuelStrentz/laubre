@@ -185,3 +185,21 @@ describe('sélection avant import (lot 4)', async () => {
     expect([...s].sort()).toEqual(['000', '001', '01', '010'])
   })
 })
+
+describe('belle-famille (lot 5)', () => {
+  it('exclue des statistiques par défaut, incluse sur demande', () => {
+    const db = nouvelleBase()
+    arbre.ajouter(db, { niveau: '0', prenom1: 'S', naissance_departement: 'Isère' }, true)
+    arbre.ajouter(db, { niveau: '1', prenom1: 'C', naissance_departement: 'Ardèche' })
+    arbre.ajouter(db, { niveau: '10', prenom1: 'BP', naissance_departement: 'Ardèche', naissance_date: '1960' })
+    arbre.ajouter(db, { niveau: '11', prenom1: 'BM', naissance_departement: 'Ardèche' })
+    arbre.ajouter(db, { niveau: '00', prenom1: 'P' })
+    expect(arbre.statistiques(db)).toMatchObject({ individus: 3, familles: 1, generations: 2 })
+    expect(arbre.statistiques(db, true)).toMatchObject({ individus: 5, familles: 2, generations: 2 })
+    expect(arbre.statistiquesDetaillees(db).departements).toEqual([
+      { libelle: 'Ardèche', valeur: 1 }, { libelle: 'Isère', valeur: 1 },
+    ])
+    expect(arbre.statistiquesDetaillees(db, true).departements[0]).toEqual({ libelle: 'Ardèche', valeur: 3 })
+    expect(arbre.statistiques(db).completude.find((c) => c.champ === 'Date de naissance')!.total).toBe(3)
+  })
+})
